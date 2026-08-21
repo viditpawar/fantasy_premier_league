@@ -28,7 +28,7 @@ Work in progress, built step by step:
 - [x] Historical season backfill (last 5 completed seasons)
 - [x] Production Postgres on Supabase, seeded with live + historical data
 - [x] GitHub Actions scheduled run (writes to Supabase Postgres)
-- [ ] Grafana dashboard
+- [x] Grafana dashboard
 - [ ] AI advisor
 
 ## Local development
@@ -44,6 +44,14 @@ pip install -e ".[dev]"
 `DATABASE_URL` in `.env` points at the local Docker Postgres by default. The
 production ingest job (run via GitHub Actions) points at a hosted Supabase
 Postgres instance instead, configured via repo secrets.
+
+`docker compose up -d` also starts Grafana at http://localhost:3001
+(login `admin` / `admin`, or whatever `GRAFANA_ADMIN_PASSWORD` is set to) with
+an "FPL Overview" dashboard already provisioned — current rank, season points,
+top scorers, and your current squad. It reads from the same local Postgres by
+default; to point it at production Supabase instead, override the
+`GRAFANA_POSTGRES_*` variables in `.env` with the session pooler
+host/port/db/user/password and set `GRAFANA_POSTGRES_SSLMODE=require`.
 
 ## Production setup (Supabase + GitHub Actions)
 
