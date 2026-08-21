@@ -16,5 +16,27 @@ services:
       timeout: 5s
       retries: 10
 
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: fpl-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      POSTGRES_HOST: ${GRAFANA_POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: ${GRAFANA_POSTGRES_PORT:-5432}
+      POSTGRES_DB: ${GRAFANA_POSTGRES_DB:-fpl}
+      POSTGRES_USER: ${GRAFANA_POSTGRES_USER:-fpl}
+      POSTGRES_PASSWORD: ${GRAFANA_POSTGRES_PASSWORD:-fpl}
+      POSTGRES_SSLMODE: ${GRAFANA_POSTGRES_SSLMODE:-disable}
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   postgres-data:
+  grafana-data:

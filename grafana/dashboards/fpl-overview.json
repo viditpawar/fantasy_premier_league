@@ -1,0 +1,80 @@
+{
+  "uid": "fpl-overview",
+  "title": "FPL Overview",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "",
+  "time": { "from": "now-1y", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Current Overall Rank",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "postgres", "uid": "fpl-postgres" },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawSql": "select overall_rank from manager_gameweek_history where team_id = (select team_id from managers limit 1) order by season desc, gameweek desc limit 1"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Total Points (current season)",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "postgres", "uid": "fpl-postgres" },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawSql": "select total_points from manager_gameweek_history where team_id = (select team_id from managers limit 1) order by season desc, gameweek desc limit 1"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "table",
+      "title": "Top Scorers (current season)",
+      "gridPos": { "h": 12, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "postgres", "uid": "fpl-postgres" },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawSql": "select p.web_name as player, t.short_name as team, sum(s.total_points) as points, sum(s.goals_scored) as goals, sum(s.assists) as assists from player_gameweek_stats s join players p on p.season = s.season and p.code = s.player_code join teams t on t.season = s.season and t.id = p.team_id where s.season = (select season from gameweeks where is_current = true limit 1) group by p.web_name, t.short_name order by points desc limit 15"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "barchart",
+      "title": "Points per Gameweek (current season)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "datasource": { "type": "postgres", "uid": "fpl-postgres" },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawSql": "select gameweek, points from manager_gameweek_history where team_id = (select team_id from managers limit 1) and season = (select season from gameweeks where is_current = true limit 1) order by gameweek"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "table",
+      "title": "Your Current Squad",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 12 },
+      "datasource": { "type": "postgres", "uid": "fpl-postgres" },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawSql": "select p.web_name as player, t.short_name as team, mp.squad_position, mp.multiplier, mp.is_captain from manager_picks mp join players p on p.season = mp.season and p.id = mp.player_id join teams t on t.season = mp.season and t.id = p.team_id where mp.team_id = (select team_id from managers limit 1) and mp.gameweek = (select max(gameweek) from manager_gameweek_history where team_id = (select team_id from managers limit 1)) order by mp.squad_position"
+        }
+      ]
+    }
+  ]
+}
