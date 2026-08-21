@@ -27,6 +27,10 @@ class FPLClient:
         """A single player's full history plus upcoming fixtures."""
         return self._get(f"/element-summary/{element_id}/")
 
+    def event_live(self, event_id: int) -> dict:
+        """Every player's stats for a single gameweek, in one call."""
+        return self._get(f"/event/{event_id}/live/")
+
     def entry(self, team_id: int) -> dict:
         """A manager's team: name, overall rank, current season summary."""
         return self._get(f"/entry/{team_id}/")
