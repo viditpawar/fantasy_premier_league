@@ -21,11 +21,11 @@ multi-season history instead of just the current gameweek snapshot.
 
 Work in progress, built step by step:
 
-- [x] Project scaffolding (this step)
-- [ ] FPL API client
-- [ ] Postgres schema + local Docker Postgres
-- [ ] Historical season backfill
-- [ ] Live gameweek ingest job
+- [x] Project scaffolding
+- [x] FPL API client
+- [x] Postgres schema + local Docker Postgres
+- [x] Live gameweek ingest job
+- [x] Historical season backfill (last 5 completed seasons)
 - [ ] GitHub Actions scheduled run (writes to Supabase Postgres)
 - [ ] Grafana dashboard
 - [ ] AI advisor
