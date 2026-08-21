@@ -29,7 +29,7 @@ Work in progress, built step by step:
 - [x] Production Postgres on Supabase, seeded with live + historical data
 - [x] GitHub Actions scheduled run (writes to Supabase Postgres)
 - [x] Grafana dashboard
-- [ ] AI advisor
+- [x] AI advisor
 
 ## Local development
 
@@ -74,3 +74,15 @@ export DATABASE_URL="<supabase session pooler connection string>"
 python -m fpl_pipeline.db.connection
 python -m fpl_pipeline.ingest.historical
 ```
+
+## AI advisor
+
+```
+export ANTHROPIC_API_KEY="<your key from console.anthropic.com>"
+python -m fpl_pipeline.advisor
+```
+
+Reasons over your current squad, each player's last-5-gameweek form, next-3
+fixture difficulty, your budget, and in-form alternatives at each position
+(all pulled from Postgres), and prints transfer and captaincy suggestions
+grounded in that data via the Claude API.
