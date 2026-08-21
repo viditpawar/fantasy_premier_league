@@ -67,14 +67,17 @@ def ingest_players_historical(
             r.team,
             r.element_type,
             r.now_cost,
+            r.status,
+            r.news,
+            r.chance_of_playing_next_round,
         )
         for r in players_df.itertuples()
     ]
     conn.cursor().executemany(
         """
         INSERT INTO players (season, id, code, first_name, second_name, web_name,
-            team_id, element_type, now_cost)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            team_id, element_type, now_cost, status, news, chance_of_playing_next_round)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (season, id) DO UPDATE SET
             code = EXCLUDED.code,
             first_name = EXCLUDED.first_name,
@@ -82,7 +85,10 @@ def ingest_players_historical(
             web_name = EXCLUDED.web_name,
             team_id = EXCLUDED.team_id,
             element_type = EXCLUDED.element_type,
-            now_cost = EXCLUDED.now_cost
+            now_cost = EXCLUDED.now_cost,
+            status = EXCLUDED.status,
+            news = EXCLUDED.news,
+            chance_of_playing_next_round = EXCLUDED.chance_of_playing_next_round
         """,
         rows,
     )
@@ -102,14 +108,16 @@ def ingest_fixtures_historical(
             r.team_a_score,
             r.kickoff_time,
             bool(r.finished),
+            r.team_h_difficulty,
+            r.team_a_difficulty,
         )
         for r in fixtures_df.itertuples()
     ]
     conn.cursor().executemany(
         """
         INSERT INTO fixtures (season, id, gameweek, team_h, team_a, team_h_score,
-            team_a_score, kickoff_time, finished)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            team_a_score, kickoff_time, finished, team_h_difficulty, team_a_difficulty)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (season, id) DO UPDATE SET
             gameweek = EXCLUDED.gameweek,
             team_h = EXCLUDED.team_h,
@@ -117,7 +125,9 @@ def ingest_fixtures_historical(
             team_h_score = EXCLUDED.team_h_score,
             team_a_score = EXCLUDED.team_a_score,
             kickoff_time = EXCLUDED.kickoff_time,
-            finished = EXCLUDED.finished
+            finished = EXCLUDED.finished,
+            team_h_difficulty = EXCLUDED.team_h_difficulty,
+            team_a_difficulty = EXCLUDED.team_a_difficulty
         """,
         rows,
     )
