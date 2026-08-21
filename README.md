@@ -26,6 +26,7 @@ Work in progress, built step by step:
 - [x] Postgres schema + local Docker Postgres
 - [x] Live gameweek ingest job
 - [x] Historical season backfill (last 5 completed seasons)
+- [x] Production Postgres on Supabase, seeded with live + historical data
 - [ ] GitHub Actions scheduled run (writes to Supabase Postgres)
 - [ ] Grafana dashboard
 - [ ] AI advisor
@@ -43,3 +44,25 @@ pip install -e ".[dev]"
 `DATABASE_URL` in `.env` points at the local Docker Postgres by default. The
 production ingest job (run via GitHub Actions) points at a hosted Supabase
 Postgres instance instead, configured via repo secrets.
+
+## Production setup (Supabase + GitHub Actions)
+
+The GitHub Actions workflow (`.github/workflows/ingest.yml`) needs two repo
+secrets, set at Settings → Secrets and variables → Actions:
+
+- `DATABASE_URL` — Supabase's **session pooler** connection string (Project
+  Settings → Database → Connection string → Session pooler tab), of the form
+  `postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres`.
+  Use the pooler host, not the direct `db.<ref>.supabase.co` host — the direct
+  host is IPv6-only and fails to resolve on many networks/runners.
+- `FPL_TEAM_ID` — your FPL entry id.
+
+The schema and historical backfill only need to be run once against a fresh
+Supabase database (the scheduled job only handles the live/current-season
+data from then on):
+
+```
+export DATABASE_URL="<supabase session pooler connection string>"
+python -m fpl_pipeline.db.connection
+python -m fpl_pipeline.ingest.historical
+```
