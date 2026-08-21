@@ -27,7 +27,7 @@ Work in progress, built step by step:
 - [x] Live gameweek ingest job
 - [x] Historical season backfill (last 5 completed seasons)
 - [x] Production Postgres on Supabase, seeded with live + historical data
-- [ ] GitHub Actions scheduled run (writes to Supabase Postgres)
+- [x] GitHub Actions scheduled run (writes to Supabase Postgres)
 - [ ] Grafana dashboard
 - [ ] AI advisor
 
