@@ -1,0 +1,22 @@
+name: Live ingest
+
+on:
+  schedule:
+    - cron: "0 */2 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build ingest image
+        run: docker build -t fpl-ingest .
+
+      - name: Run ingest
+        run: |
+          docker run --rm \
+            -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+            -e FPL_TEAM_ID="${{ secrets.FPL_TEAM_ID }}" \
+            fpl-ingest
