@@ -5,6 +5,15 @@ on:
     - cron: "0 */2 * * *"
   workflow_dispatch: {}
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
 jobs:
   ingest:
     runs-on: ubuntu-latest
@@ -20,3 +29,29 @@ jobs:
             -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
             -e FPL_TEAM_ID="${{ secrets.FPL_TEAM_ID }}" \
             fpl-ingest
+
+  publish-squad-page:
+    needs: ingest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install package
+        run: pip install .
+
+      - name: Generate squad page
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python -m fpl_pipeline.pages.squad_page
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+      - uses: actions/deploy-pages@v4
