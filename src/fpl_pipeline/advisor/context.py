@@ -47,9 +47,9 @@ def get_squad(conn: psycopg.Connection, team_id: int, season: str, gameweek: int
         cur.execute(
             """
             select p.web_name as player, p.element_type, t.short_name as team,
-                p.team_id, p.code as player_code, p.now_cost, p.status, p.news,
-                p.chance_of_playing_next_round, mp.squad_position, mp.multiplier,
-                mp.is_captain, mp.is_vice_captain
+                t.code as team_code, p.team_id, p.code as player_code, p.now_cost,
+                p.status, p.news, p.chance_of_playing_next_round, mp.squad_position,
+                mp.multiplier, mp.is_captain, mp.is_vice_captain
             from manager_picks mp
             join players p on p.season = mp.season and p.id = mp.player_id
             join teams t on t.season = mp.season and t.id = p.team_id

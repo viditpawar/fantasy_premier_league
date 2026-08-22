@@ -6,6 +6,7 @@
 CREATE TABLE IF NOT EXISTS teams (
     season TEXT NOT NULL,
     id INT NOT NULL,
+    code INT,
     name TEXT NOT NULL,
     short_name TEXT NOT NULL,
     strength_overall_home INT,
@@ -16,6 +17,8 @@ CREATE TABLE IF NOT EXISTS teams (
     strength_defence_away INT,
     PRIMARY KEY (season, id)
 );
+
+ALTER TABLE teams ADD COLUMN IF NOT EXISTS code INT;
 
 CREATE TABLE IF NOT EXISTS players (
     season TEXT NOT NULL,
