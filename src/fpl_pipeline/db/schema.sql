@@ -27,9 +27,16 @@ CREATE TABLE IF NOT EXISTS players (
     team_id INT NOT NULL,
     element_type INT NOT NULL,
     now_cost INT NOT NULL,
+    status TEXT,
+    news TEXT,
+    chance_of_playing_next_round INT,
     PRIMARY KEY (season, id),
     FOREIGN KEY (season, team_id) REFERENCES teams (season, id)
 );
+
+ALTER TABLE players ADD COLUMN IF NOT EXISTS status TEXT;
+ALTER TABLE players ADD COLUMN IF NOT EXISTS news TEXT;
+ALTER TABLE players ADD COLUMN IF NOT EXISTS chance_of_playing_next_round INT;
 
 CREATE TABLE IF NOT EXISTS gameweeks (
     season TEXT NOT NULL,
@@ -54,10 +61,15 @@ CREATE TABLE IF NOT EXISTS fixtures (
     team_a_score INT,
     kickoff_time TIMESTAMPTZ,
     finished BOOLEAN NOT NULL DEFAULT FALSE,
+    team_h_difficulty INT,
+    team_a_difficulty INT,
     PRIMARY KEY (season, id),
     FOREIGN KEY (season, team_h) REFERENCES teams (season, id),
     FOREIGN KEY (season, team_a) REFERENCES teams (season, id)
 );
+
+ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS team_h_difficulty INT;
+ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS team_a_difficulty INT;
 
 -- One row per player per gameweek: the core historical fact table the AI
 -- advisor reasons over.
