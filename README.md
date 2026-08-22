@@ -77,12 +77,20 @@ python -m fpl_pipeline.ingest.historical
 
 ## AI advisor
 
+Builds a prompt from your current squad, each player's last-5-gameweek form,
+next-3 fixture difficulty, your budget, and in-form alternatives at each
+position (all pulled from Postgres):
+
 ```
-export ANTHROPIC_API_KEY="<your key from console.anthropic.com>"
 python -m fpl_pipeline.advisor
 ```
 
-Reasons over your current squad, each player's last-5-gameweek form, next-3
-fixture difficulty, your budget, and in-form alternatives at each position
-(all pulled from Postgres), and prints transfer and captaincy suggestions
-grounded in that data via the Claude API.
+By default this prints the prompt for you to paste into a free chat at
+claude.ai — no API costs. If you'd rather it call the Claude API directly
+and print the suggestions straight to your terminal (costs a small amount
+of usage credit per run, from console.anthropic.com):
+
+```
+export ANTHROPIC_API_KEY="<your key from console.anthropic.com>"
+python -m fpl_pipeline.advisor --api
+```
