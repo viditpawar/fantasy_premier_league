@@ -15,4 +15,5 @@ data/raw/
 data/warehouse/
 grafana/data/
 postgres-data/
+public/
 .DS_Store
