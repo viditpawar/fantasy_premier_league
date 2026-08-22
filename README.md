@@ -33,6 +33,7 @@ Work in progress, built step by step:
 - [x] Grafana dashboard
 - [x] AI advisor
 - [x] Auto-updating squad page (GitHub Pages)
+- [x] Next.js frontend (squad + dashboard) on Vercel, reading Supabase directly
 
 ## Local development
 
@@ -107,6 +108,46 @@ python -m fpl_pipeline.pages.squad_page
 ```
 
 writes `public/index.html` — open it directly in a browser.
+
+## Frontend (Next.js on Vercel)
+
+A real web app (`web/`) that queries Supabase directly from the browser/server
+(no Python backend involved) — a squad page (same info as the GitHub Pages
+version, plus live formation view) and a dashboard (rank/points history, top
+scorers).
+
+This only works because Row Level Security is enabled on every table with a
+public **read-only** policy for the `anon` role (see `schema.sql`) — the
+frontend uses Supabase's anon/publishable key, which is meant to be public
+and safe to embed in client code; it can only ever `SELECT`, never write.
+
+### Local development
+
+```
+cd web
+cp .env.local.example .env.local
+```
+
+Fill in `.env.local` with your Supabase project URL and anon/publishable key
+(Project Settings → API):
+
+```
+npm install
+npm run dev
+```
+
+Visit http://localhost:3000 (squad) and http://localhost:3000/dashboard.
+
+### Deploy to Vercel
+
+1. Go to vercel.com → **New Project** → import this GitHub repo.
+2. Set **Root Directory** to `web` (important — the Next.js app isn't at the repo root).
+3. Add two environment variables (from the same Supabase API settings page):
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+4. Deploy. Every push to `main` auto-deploys; every page load fetches fresh
+   data straight from Supabase, so there's nothing to keep "in sync" — no
+   ingest job dependency, no rebuild needed when the data changes.
 
 ## AI advisor
 
