@@ -30,6 +30,7 @@ Work in progress, built step by step:
 - [x] GitHub Actions scheduled run (writes to Supabase Postgres)
 - [x] Grafana dashboard
 - [x] AI advisor
+- [x] Auto-updating squad page (GitHub Pages)
 
 ## Local development
 
@@ -74,6 +75,25 @@ export DATABASE_URL="<supabase session pooler connection string>"
 python -m fpl_pipeline.db.connection
 python -m fpl_pipeline.ingest.historical
 ```
+
+## Auto-updating squad page
+
+Every scheduled ingest run also regenerates a static "pitch view" of your
+current squad (`src/fpl_pipeline/pages/squad_page.py`) and publishes it to
+GitHub Pages — a real URL that reflects whatever squad is actually locked in,
+with no manual step ever needed.
+
+One-time setup: go to Settings → Pages → **Source: GitHub Actions** (not
+"Deploy from a branch"). After the next workflow run, the page is live at
+`https://<username>.github.io/<repo>/`.
+
+To generate it locally instead:
+
+```
+python -m fpl_pipeline.pages.squad_page
+```
+
+writes `public/index.html`.
 
 ## AI advisor
 
