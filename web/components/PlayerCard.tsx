@@ -1,5 +1,7 @@
 import { SquadPlayer } from "@/lib/types";
-import { teamColor } from "@/lib/teamColors";
+
+const SHIRT_URL = (code: number) =>
+  `https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_${code}-66.png`;
 
 const STATUS_LABELS: Record<string, string> = {
   d: "Doubtful",
@@ -48,13 +50,12 @@ export function PlayerCard({ player }: { player: SquadPlayer }) {
         </span>
       )}
 
-      <div
-        className="mx-auto mb-1.5 h-[50px] w-[46px] shadow-md transition-transform group-hover:-translate-y-0.5"
-        style={{
-          background: teamColor(player.team),
-          clipPath:
-            "polygon(30% 0%, 70% 0%, 70% 10%, 100% 22%, 86% 42%, 70% 32%, 70% 100%, 30% 100%, 30% 32%, 14% 42%, 0% 22%, 30% 10%)",
-        }}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={SHIRT_URL(player.teamCode)}
+        alt={`${player.team} shirt`}
+        className="mx-auto mb-1.5 h-11 w-11 object-contain drop-shadow transition-transform group-hover:-translate-y-0.5"
+        loading="lazy"
       />
 
       <div className="rounded-md bg-white px-1.5 py-1 text-[11.5px] leading-tight shadow">

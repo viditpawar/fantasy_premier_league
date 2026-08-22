@@ -11,15 +11,7 @@ from datetime import datetime, timezone
 from fpl_pipeline.advisor.context import build_context
 from fpl_pipeline.db.connection import get_connection
 
-TEAM_COLORS = {
-    "ARS": "#EF0107", "AVL": "#670E36", "BOU": "#DA291C", "BRE": "#e30613",
-    "BHA": "#0057B8", "BUR": "#6C1D45", "CHE": "#034694", "CRY": "#1B458F",
-    "EVE": "#003399", "FUL": "#000000", "LIV": "#C8102E", "MCI": "#6CABDD",
-    "MUN": "#DA291C", "NEW": "#241F20", "NFO": "#DD0000", "SUN": "#EB172B",
-    "TOT": "#132257", "WHU": "#7A263A", "WOL": "#FDB913", "LEE": "#FFCD00",
-    "COV": "#78D0F7",
-}
-DEFAULT_COLOR = "#6b7280"
+SHIRT_URL = "https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_{code}-66.png"
 
 POSITION_ORDER = ["GKP", "DEF", "MID", "FWD"]
 
@@ -54,7 +46,6 @@ def _difficulty_class(diff: int | None) -> str:
 
 
 def _player_card(player: dict) -> str:
-    color = TEAM_COLORS.get(player["team"], DEFAULT_COLOR)
     badge = ""
     if player["is_captain"]:
         badge = '<span class="badge captain" title="Captain">C</span>'
@@ -69,12 +60,13 @@ def _player_card(player: dict) -> str:
 
     fixture_text, difficulty = _fixture_tag(player)
     diff_class = _difficulty_class(difficulty)
+    shirt_url = SHIRT_URL.format(code=player["team_code"])
 
     return f"""
     <div class="player-card">
       {badge}
       {warning}
-      <div class="shirt" style="background:{color}"></div>
+      <img class="shirt" src="{shirt_url}" alt="{html.escape(player['team'])} shirt" loading="lazy">
       <div class="name-tag">
         <div class="name">{html.escape(player['player'])}</div>
         <div class="fixture {diff_class}">{fixture_text}</div>
@@ -173,9 +165,8 @@ def render_squad_html(context: dict) -> str:
   .player-card:hover {{ transform: translateY(-3px); }}
 
   .shirt {{
-    width: 46px; height: 50px; margin: 0 auto 6px;
-    clip-path: polygon(30% 0%, 70% 0%, 70% 10%, 100% 22%, 86% 42%, 70% 32%, 70% 100%, 30% 100%, 30% 32%, 14% 42%, 0% 22%, 30% 10%);
-    box-shadow: 0 2px 6px rgba(0,0,0,.45);
+    width: 44px; height: 44px; margin: 0 auto 6px; object-fit: contain;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,.45));
   }}
 
   .name-tag {{

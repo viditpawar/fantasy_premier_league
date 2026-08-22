@@ -22,6 +22,7 @@ def ingest_teams_historical(conn: psycopg.Connection, season: str, teams_df: pd.
         (
             season,
             r.id,
+            r.code,
             r.name,
             r.short_name,
             r.strength_overall_home,
@@ -35,11 +36,12 @@ def ingest_teams_historical(conn: psycopg.Connection, season: str, teams_df: pd.
     ]
     conn.cursor().executemany(
         """
-        INSERT INTO teams (season, id, name, short_name, strength_overall_home,
+        INSERT INTO teams (season, id, code, name, short_name, strength_overall_home,
             strength_overall_away, strength_attack_home, strength_attack_away,
             strength_defence_home, strength_defence_away)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (season, id) DO UPDATE SET
+            code = EXCLUDED.code,
             name = EXCLUDED.name,
             short_name = EXCLUDED.short_name,
             strength_overall_home = EXCLUDED.strength_overall_home,
