@@ -20,6 +20,7 @@ export interface SquadPlayer {
   position: Position;
   team: string;
   teamId: number;
+  teamCode: number;
   playerCode: number;
   nowCost: number;
   price: number;

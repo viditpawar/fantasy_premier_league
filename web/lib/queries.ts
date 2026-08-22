@@ -127,11 +127,11 @@ export async function getSquad(
   const teamIds = [...new Set(players.map((p) => p.team_id))];
   const { data: teams, error: teamsError } = await sb
     .from("teams")
-    .select("id, short_name")
+    .select("id, code, short_name")
     .eq("season", season)
     .in("id", teamIds);
   if (teamsError) throw teamsError;
-  const teamById = new Map(teams.map((t) => [t.id, t.short_name]));
+  const teamById = new Map(teams.map((t) => [t.id, t]));
 
   const playerCodes = players.map((p) => p.code);
   const { data: stats } = await sb
@@ -151,12 +151,14 @@ export async function getSquad(
 
   return picks.map((pick) => {
     const player = playerById.get(pick.player_id)!;
+    const team = teamById.get(player.team_id);
     return {
       player: player.web_name,
       elementType: player.element_type,
       position: POSITION_NAMES[player.element_type],
-      team: teamById.get(player.team_id) ?? "?",
+      team: team?.short_name ?? "?",
       teamId: player.team_id,
+      teamCode: team?.code ?? 0,
       playerCode: player.code,
       nowCost: player.now_cost,
       price: player.now_cost / 10,
