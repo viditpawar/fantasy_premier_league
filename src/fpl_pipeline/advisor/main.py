@@ -1,10 +1,13 @@
 """AI advisor: reasons over the current squad plus historical/upcoming context
 from the warehouse and suggests transfers and a captaincy pick.
+
+By default, prints a combined prompt to paste into a free Claude.ai chat —
+no API credits needed. Pass --api to call the Claude API directly instead
+(requires ANTHROPIC_API_KEY and paid usage credits).
 """
 
+import argparse
 import json
-
-import anthropic
 
 from fpl_pipeline.db.connection import get_connection
 
@@ -39,7 +42,15 @@ def build_prompt(context: dict) -> str:
     )
 
 
-def run_advisor() -> str:
+def build_full_prompt() -> str:
+    with get_connection() as conn:
+        context = build_context(conn)
+    return f"{SYSTEM_PROMPT}\n\n---\n\n{build_prompt(context)}"
+
+
+def run_advisor_api() -> str:
+    import anthropic
+
     with get_connection() as conn:
         context = build_context(conn)
 
@@ -53,5 +64,21 @@ def run_advisor() -> str:
     return next(block.text for block in response.content if block.type == "text")
 
 
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--api",
+        action="store_true",
+        help="Call the Claude API directly instead of printing a prompt to paste manually (requires ANTHROPIC_API_KEY and paid usage credits)",
+    )
+    args = parser.parse_args()
+
+    if args.api:
+        print(run_advisor_api())
+    else:
+        print(build_full_prompt())
+        print("\n\n--- Copy everything above into a new chat at claude.ai ---")
+
+
 if __name__ == "__main__":
-    print(run_advisor())
+    main()

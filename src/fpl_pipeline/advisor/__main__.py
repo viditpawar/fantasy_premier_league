@@ -1,4 +1,4 @@
-from .main import run_advisor
+from .main import main
 
 if __name__ == "__main__":
-    print(run_advisor())
+    main()
