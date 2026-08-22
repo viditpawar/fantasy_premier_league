@@ -1,3 +1,5 @@
+![Fantasy Premier League AI](docs/assets/image.png)
+
 # Fantasy Premier League Pipeline
 
 A data pipeline for Fantasy Premier League: ingest live FPL API data and historical
