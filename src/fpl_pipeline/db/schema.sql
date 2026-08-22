@@ -141,3 +141,24 @@ CREATE TABLE IF NOT EXISTS manager_picks (
     is_vice_captain BOOLEAN NOT NULL DEFAULT FALSE,
     PRIMARY KEY (team_id, season, gameweek, player_id)
 );
+
+-- Public read-only access for the frontend (Supabase anon key). The ingest
+-- job connects as the table owner, which bypasses RLS, so this only
+-- restricts anonymous/frontend access, never the pipeline itself. Only
+-- applies on Supabase, which provisions the `anon` role; local Docker
+-- Postgres has no such role and isn't exposed publicly, so this is a no-op
+-- there.
+DO $$
+DECLARE
+    t TEXT;
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+        FOR t IN SELECT unnest(ARRAY['teams', 'players', 'gameweeks', 'fixtures',
+            'player_gameweek_stats', 'managers', 'manager_gameweek_history', 'manager_picks'])
+        LOOP
+            EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
+            EXECUTE format('DROP POLICY IF EXISTS public_read ON %I', t);
+            EXECUTE format('CREATE POLICY public_read ON %I FOR SELECT TO anon USING (true)', t);
+        END LOOP;
+    END IF;
+END $$;
