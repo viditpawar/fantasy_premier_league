@@ -11,8 +11,8 @@ LLM-based transfer/captaincy advisor.
 ```
 FPL live API ─┐
               ├─> ingest job (Python, Docker, GitHub Actions cron) ─> Postgres ─┬─> Grafana dashboard
-Historical    ─┘                                                                └─> AI advisor
-season data
+Historical    ─┘                                                                ├─> AI advisor
+season data                                                                     └─> Next.js frontend (Vercel)
 ```
 
 The ingest job is the only thing that writes to Postgres. Both the dashboard and
@@ -63,42 +63,11 @@ python -m fpl_pipeline.db.connection
 python -m fpl_pipeline.ingest.historical
 ```
 
-## Auto-updating squad page
-
-Live at **https://viditpawar.github.io/fantasy_premier_league/**.
-
-Every scheduled ingest run regenerates a static "pitch view" of your current
-squad (`src/fpl_pipeline/pages/squad_page.py`) and publishes it to GitHub
-Pages — no manual step ever needed. It shows:
-
-- Formation view on a pitch, grouped by position, with captain (C) and
-  vice-captain (V) badges
-- A red warning badge on any player flagged injured/suspended/doubtful/unavailable
-  (hover for the reason)
-- Each player's next fixture, colour-coded by difficulty (green = easy,
-  amber = medium, red = hard)
-- Last gameweek's points per player
-- A stats row: total points, overall rank, squad value, money in the bank
-- Substitutes bench, in order
-- "Generated at" timestamp so you can see how fresh it is
-
-One-time setup: Settings → Pages → **Source: GitHub Actions** (not "Deploy
-from a branch").
-
-To generate it locally instead:
-
-```
-python -m fpl_pipeline.pages.squad_page
-```
-
-writes `public/index.html` — open it directly in a browser.
-
 ## Frontend (Next.js on Vercel)
 
 A real web app (`web/`) that queries Supabase directly from the browser/server
-(no Python backend involved) — a squad page (same info as the GitHub Pages
-version, plus live formation view) and a dashboard (rank/points history, top
-scorers).
+(no Python backend involved) — a squad page with a live formation view, a
+dashboard (rank/points history, top scorers), and a transfer-suggestions page.
 
 This only works because Row Level Security is enabled on every table with a
 public **read-only** policy for the `anon` role (see `schema.sql`) — the
