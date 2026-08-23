@@ -11,11 +11,11 @@ const STATUS_LABELS: Record<string, string> = {
   n: "Not available",
 };
 
-function difficultyClass(diff: number | null | undefined): string {
-  if (diff == null) return "text-gray-400";
-  if (diff <= 2) return "text-green-500";
-  if (diff === 3) return "text-amber-500";
-  return "text-red-500";
+function difficultyColor(diff: number | null | undefined): string {
+  if (diff == null) return "var(--text-muted)";
+  if (diff <= 2) return "var(--status-good)";
+  if (diff === 3) return "var(--status-warning)";
+  return "var(--status-critical)";
 }
 
 export function PlayerCard({ player }: { player: SquadPlayer }) {
@@ -27,7 +27,8 @@ export function PlayerCard({ player }: { player: SquadPlayer }) {
     <div className="relative w-20 sm:w-24 text-center group">
       {player.isCaptain && (
         <span
-          className="absolute -top-1.5 right-3 z-10 flex h-[19px] w-[19px] items-center justify-center rounded-full bg-cyan-400 text-[11px] font-extrabold text-slate-900 shadow"
+          className="absolute -top-1.5 right-3 z-10 flex h-[19px] w-[19px] items-center justify-center rounded-full text-[11px] font-extrabold text-slate-900 shadow ring-2 ring-black/20"
+          style={{ background: "var(--accent-green)" }}
           title="Captain"
         >
           C
@@ -35,7 +36,7 @@ export function PlayerCard({ player }: { player: SquadPlayer }) {
       )}
       {player.isViceCaptain && (
         <span
-          className="absolute -top-1.5 right-3 z-10 flex h-[19px] w-[19px] items-center justify-center rounded-full bg-gray-300 text-[11px] font-extrabold text-slate-900 shadow"
+          className="absolute -top-1.5 right-3 z-10 flex h-[19px] w-[19px] items-center justify-center rounded-full bg-gray-200 text-[11px] font-extrabold text-slate-900 shadow ring-2 ring-black/20"
           title="Vice-captain"
         >
           V
@@ -43,7 +44,8 @@ export function PlayerCard({ player }: { player: SquadPlayer }) {
       )}
       {isUnavailable && (
         <span
-          className="absolute -top-1.5 left-3 z-10 flex h-[18px] w-[18px] cursor-help items-center justify-center rounded-full bg-red-500 text-[12px] font-extrabold text-white shadow"
+          className="absolute -top-1.5 left-3 z-10 flex h-[18px] w-[18px] cursor-help items-center justify-center rounded-full text-[12px] font-extrabold text-white shadow animate-pulse"
+          style={{ background: "var(--status-critical)" }}
           title={player.news || STATUS_LABELS[player.status] || "Flagged"}
         >
           !
@@ -54,15 +56,24 @@ export function PlayerCard({ player }: { player: SquadPlayer }) {
       <img
         src={SHIRT_URL(player.teamCode)}
         alt={`${player.team} shirt`}
-        className="mx-auto mb-1.5 h-11 w-11 object-contain drop-shadow transition-transform group-hover:-translate-y-0.5"
+        className="mx-auto mb-1.5 h-11 w-11 object-contain drop-shadow-[0_4px_6px_rgba(0,0,0,0.35)] transition-transform duration-150 group-hover:-translate-y-1"
         loading="lazy"
       />
 
-      <div className="rounded-md bg-white px-1.5 py-1 text-[11.5px] leading-tight shadow">
+      <div className="rounded-t-lg bg-white/95 px-1.5 py-1 text-[11.5px] leading-tight shadow-sm backdrop-blur-sm transition-shadow group-hover:shadow-md">
         <div className="truncate font-bold text-slate-900">{player.player}</div>
-        <div className={`font-semibold ${difficultyClass(fixture?.difficulty)}`}>{fixtureText}</div>
+        <div className="flex items-center justify-center gap-1 font-semibold text-slate-600">
+          <span
+            className="inline-block h-1.5 w-1.5 rounded-full"
+            style={{ background: difficultyColor(fixture?.difficulty) }}
+          />
+          {fixtureText}
+        </div>
       </div>
-      <div className="rounded-b-md bg-[#37003c] py-0.5 text-[11px] font-bold text-white">
+      <div
+        className="rounded-b-lg py-0.5 text-[11px] font-bold text-white"
+        style={{ background: "linear-gradient(90deg, var(--accent-purple), var(--accent-purple-bright))" }}
+      >
         {player.lastGameweekPoints} pts
       </div>
     </div>
