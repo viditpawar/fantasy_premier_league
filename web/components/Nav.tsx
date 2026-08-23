@@ -11,6 +11,9 @@ export function Nav() {
         <Link href="/dashboard" className="text-sm font-semibold text-gray-300 hover:text-white">
           Dashboard
         </Link>
+        <Link href="/transfers" className="text-sm font-semibold text-gray-300 hover:text-white">
+          Transfers
+        </Link>
       </div>
     </nav>
   );
