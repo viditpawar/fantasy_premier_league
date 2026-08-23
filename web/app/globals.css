@@ -1,8 +1,31 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #060714;
+  --foreground: #f4f5fb;
+
+  --bg-page: #060714;
+  --bg-page-alt: #0a0d22;
+  --bg-surface: rgba(255, 255, 255, 0.045);
+  --bg-surface-strong: rgba(255, 255, 255, 0.075);
+  --border-hairline: rgba(255, 255, 255, 0.09);
+  --border-hairline-strong: rgba(255, 255, 255, 0.16);
+
+  --text-primary: #f4f5fb;
+  --text-secondary: #a6acc6;
+  --text-muted: #6d7391;
+
+  --accent-purple: #37003c;
+  --accent-purple-bright: #7a0a86;
+  --accent-green: #00ff85;
+  --accent-cyan: #05f0ff;
+
+  --status-good: #1cd15f;
+  --status-warning: #f5a623;
+  --status-critical: #ff4d5e;
+
+  --gridline: rgba(255, 255, 255, 0.08);
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 12px 30px -14px rgba(0, 0, 0, 0.6);
 }
 
 @theme inline {
@@ -12,15 +35,31 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+body {
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(122, 10, 134, 0.35), transparent 60%),
+    radial-gradient(900px 500px at 100% 0%, rgba(5, 240, 255, 0.12), transparent 55%),
+    var(--bg-page);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+::selection {
+  background: rgba(0, 255, 133, 0.28);
+  color: var(--text-primary);
+}
+
+.card {
+  background: linear-gradient(180deg, var(--bg-surface-strong), var(--bg-surface));
+  border: 1px solid var(--border-hairline);
+  border-radius: 16px;
+  box-shadow: var(--shadow-card);
+}
+
+.section-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
