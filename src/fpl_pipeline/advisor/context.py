@@ -29,6 +29,32 @@ def get_latest_gameweek(conn: psycopg.Connection, team_id: int, season: str) -> 
     ).fetchone()[0]
 
 
+def get_free_transfers(conn: psycopg.Connection, team_id: int, season: str, upto_gameweek: int) -> int:
+    """Free transfers banked for the gameweek *after* `upto_gameweek`.
+
+    FPL rule: every manager starts with 1 free transfer for gameweek 2 (no
+    transfer concept applies to the initial gameweek 1 squad selection).
+    Each subsequent gameweek adds 1, capped at 5, minus however many
+    transfers were actually made that gameweek (transfers beyond the
+    banked free ones cost 4 points each, already reflected in
+    `event_transfers_cost` and not needed here).
+    """
+    rows = conn.execute(
+        """
+        select gameweek, event_transfers from manager_gameweek_history
+        where team_id = %s and season = %s and gameweek between 2 and %s
+        order by gameweek
+        """,
+        (team_id, season, upto_gameweek),
+    ).fetchall()
+
+    free_transfers = 1
+    for _gameweek, made in rows:
+        free_transfers = min(5, free_transfers - min(made or 0, free_transfers))
+        free_transfers = min(5, free_transfers + 1)
+    return free_transfers
+
+
 def get_budget(conn: psycopg.Connection, team_id: int, season: str, gameweek: int) -> dict:
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(
@@ -170,6 +196,7 @@ def build_context(conn: psycopg.Connection) -> dict:
     form = get_recent_form(conn, season, player_codes)
     fixtures = get_upcoming_fixtures(conn, season, team_ids)
     budget = get_budget(conn, team_id, season, gameweek)
+    free_transfers = get_free_transfers(conn, team_id, season, gameweek)
 
     for player in squad:
         player["recent_form"] = form.get(player["player_code"], [])
@@ -185,6 +212,8 @@ def build_context(conn: psycopg.Connection) -> dict:
     return {
         "season": season,
         "gameweek": gameweek,
+        "for_gameweek": gameweek + 1,
+        "free_transfers": free_transfers,
         "budget": budget,
         "squad": squad,
         "transfer_candidates": candidates,
