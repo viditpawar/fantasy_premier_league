@@ -1,20 +1,10 @@
 import { getSupabase } from "@/lib/supabase";
 import { getBudget, getCurrentSeason, getLatestGameweek, getSquad, getTeamId } from "@/lib/queries";
 import { PlayerCard } from "@/components/PlayerCard";
+import { StatTile } from "@/components/StatTile";
 import { SquadPlayer } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
-
-function StatTile({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-gray-200 bg-white px-3 py-3 text-center">
-      <div className="text-xl font-extrabold text-[#37003c]">{value}</div>
-      <div className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-        {label}
-      </div>
-    </div>
-  );
-}
 
 export default async function SquadPage() {
   const sb = getSupabase();
@@ -36,8 +26,8 @@ export default async function SquadPage() {
   return (
     <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-6">
       <header className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="text-xl font-extrabold tracking-tight">My FPL Squad</h1>
-        <span className="text-sm text-gray-400">
+        <h1 className="text-2xl font-extrabold tracking-tight text-white">My FPL Squad</h1>
+        <span className="text-sm text-[var(--text-secondary)]">
           Season {season} · after gameweek {gameweek}
         </span>
       </header>
@@ -49,23 +39,39 @@ export default async function SquadPage() {
         <StatTile label="In the bank" value={`£${(budget.bank / 10).toFixed(1)}m`} />
       </div>
 
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-[#0f9b48] to-[#0b7a38] px-3 pb-6 pt-8 shadow-inner">
-        {rows.map((row, i) => (
-          <div key={i} className="mb-6 flex flex-wrap justify-evenly gap-2 last:mb-1">
-            {row.map((p) => (
-              <PlayerCard key={p.playerCode} player={p} />
-            ))}
-          </div>
-        ))}
+      <div
+        className="relative overflow-hidden rounded-2xl px-3 pb-6 pt-8 shadow-2xl"
+        style={{
+          background:
+            "radial-gradient(120% 90% at 50% -10%, #14a852 0%, #0c8a41 42%, #0a6e35 75%, #085c2c 100%)",
+        }}
+      >
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.15]"
+          style={{
+            backgroundImage:
+              "repeating-linear-gradient(0deg, #ffffff 0, #ffffff 2px, transparent 2px, transparent 42px)",
+          }}
+        />
+        <div className="pointer-events-none absolute inset-3 rounded-xl border border-white/15" />
+        <div className="pointer-events-none absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/15" />
+
+        <div className="relative">
+          {rows.map((row, i) => (
+            <div key={i} className="mb-6 flex flex-wrap justify-evenly gap-2 last:mb-1">
+              {row.map((p) => (
+                <PlayerCard key={p.playerCode} player={p} />
+              ))}
+            </div>
+          ))}
+        </div>
       </div>
 
-      <div className="mb-2.5 mt-5 text-center text-xs font-bold uppercase tracking-widest text-gray-400">
-        Substitutes
-      </div>
-      <div className="flex flex-wrap justify-evenly gap-4 rounded-2xl border border-white/10 bg-white/5 px-3 py-4">
+      <div className="mb-2.5 mt-5 text-center section-label">Substitutes</div>
+      <div className="card flex flex-wrap justify-evenly gap-4 px-3 py-4">
         {bench.map((p, i) => (
           <div key={p.playerCode} className="text-center">
-            <div className="mb-1.5 text-[10.5px] font-bold uppercase text-gray-400">
+            <div className="mb-1.5 text-[10.5px] font-bold uppercase text-[var(--text-muted)]">
               {i + 1} · {p.position}
             </div>
             <PlayerCard player={p} />
@@ -73,7 +79,7 @@ export default async function SquadPage() {
         ))}
       </div>
 
-      <footer className="mt-6 text-center text-[11px] leading-relaxed text-gray-500">
+      <footer className="mt-6 text-center text-[11px] leading-relaxed text-[var(--text-muted)]">
         Live data, refreshed on every page load.
         <br />
         Not affiliated with the Premier League or Fantasy Premier League.
