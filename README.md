@@ -8,16 +8,50 @@ LLM-based transfer/captaincy advisor.
 
 ## Architecture
 
-```
-FPL live API ─┐
-              ├─> ingest job (Python, Docker, GitHub Actions cron) ─> Postgres ─┬─> Grafana dashboard
-Historical    ─┘                                                                ├─> AI advisor
-season data                                                                     └─> Next.js frontend (Vercel)
+```mermaid
+flowchart LR
+    subgraph Sources[" "]
+        direction TB
+        fpl[FPL live API]
+        hist[Historical season data]
+    end
+
+    subgraph Pipeline[" "]
+        direction TB
+        ingest["Ingest job\nPython · Docker\nGitHub Actions cron"]
+        db[("Postgres\n(Supabase)")]
+        ingest -->|writes| db
+    end
+
+    subgraph Consumers[" "]
+        direction TB
+        grafana[Grafana dashboard]
+        web["Next.js frontend\n(Vercel)"]
+    end
+
+    subgraph Advisor["AI advisor — free, manual, run locally"]
+        direction TB
+        cli[advisor CLI]
+        claude[claude.ai chat]
+        cli -->|prompt| claude
+        claude -->|pasted reply| cli
+    end
+
+    fpl --> ingest
+    hist --> ingest
+    db --> grafana
+    db --> web
+    db -->|context| cli
+    cli -->|"--apply writes suggestion"| db
 ```
 
-The ingest job is the only thing that writes to Postgres. Both the dashboard and
-the AI advisor read from the same warehouse, so the advisor can reason over real
-multi-season history instead of just the current gameweek snapshot.
+The ingest job writes every live/historical fact to Postgres on its own
+schedule. The advisor never calls a paid API — it only writes back when you
+manually run `--apply` after pasting its prompt into a free claude.ai chat
+(see [AI advisor](#ai-advisor) below). Everything else — the dashboard, the
+frontend, the advisor's own context — only ever reads, so the advisor can
+reason over real multi-season history instead of just the current gameweek
+snapshot.
 
 ## Local development
 
