@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  AdvisorSuggestion,
   Budget,
   GameweekHistoryPoint,
   POSITION_NAMES,
@@ -223,6 +224,42 @@ export async function getTopScorers(
     })
     .sort((a, b) => b.points - a.points)
     .slice(0, limit);
+}
+
+export async function getAdvisorSuggestion(
+  sb: SupabaseClient,
+  teamId: number,
+  season: string,
+): Promise<AdvisorSuggestion | null> {
+  const { data, error } = await sb
+    .from("advisor_suggestions")
+    .select("for_gameweek, free_transfers, suggestion, generated_at")
+    .eq("team_id", teamId)
+    .eq("season", season)
+    .order("for_gameweek", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+
+  const suggestion = data.suggestion as {
+    transfers: AdvisorSuggestion["transfers"];
+    captain: string;
+    vice_captain: string;
+    captaincy_reasoning: string;
+    summary: string;
+  };
+
+  return {
+    forGameweek: data.for_gameweek,
+    freeTransfers: data.free_transfers,
+    generatedAt: data.generated_at,
+    transfers: suggestion.transfers,
+    captain: suggestion.captain,
+    viceCaptain: suggestion.vice_captain,
+    captaincyReasoning: suggestion.captaincy_reasoning,
+    summary: suggestion.summary,
+  };
 }
 
 export async function getGameweekHistory(

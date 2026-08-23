@@ -55,3 +55,22 @@ export interface GameweekHistoryPoint {
   totalPoints: number;
   overallRank: number;
 }
+
+export interface SuggestedTransfer {
+  player_out: string;
+  player_in: string;
+  position: Position;
+  costs_points: boolean;
+  reasoning: string;
+}
+
+export interface AdvisorSuggestion {
+  forGameweek: number;
+  freeTransfers: number;
+  generatedAt: string;
+  transfers: SuggestedTransfer[];
+  captain: string;
+  viceCaptain: string;
+  captaincyReasoning: string;
+  summary: string;
+}

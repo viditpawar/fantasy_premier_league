@@ -19,22 +19,6 @@ The ingest job is the only thing that writes to Postgres. Both the dashboard and
 the AI advisor read from the same warehouse, so the advisor can reason over real
 multi-season history instead of just the current gameweek snapshot.
 
-## Status
-
-Work in progress, built step by step:
-
-- [x] Project scaffolding
-- [x] FPL API client
-- [x] Postgres schema + local Docker Postgres
-- [x] Live gameweek ingest job
-- [x] Historical season backfill (last 5 completed seasons)
-- [x] Production Postgres on Supabase, seeded with live + historical data
-- [x] GitHub Actions scheduled run (writes to Supabase Postgres)
-- [x] Grafana dashboard
-- [x] AI advisor
-- [x] Auto-updating squad page (GitHub Pages)
-- [x] Next.js frontend (squad + dashboard) on Vercel, reading Supabase directly
-
 ## Local development
 
 Requires Docker and Python 3.11+.
@@ -136,7 +120,8 @@ npm install
 npm run dev
 ```
 
-Visit http://localhost:3000 (squad) and http://localhost:3000/dashboard.
+Visit http://localhost:3000 (squad), http://localhost:3000/dashboard, and
+http://localhost:3000/transfers (AI transfer suggestions — see below).
 
 ### Deploy to Vercel
 
@@ -159,12 +144,25 @@ position (all pulled from Postgres):
 python -m fpl_pipeline.advisor
 ```
 
-By default this prints the prompt for you to paste into a free chat at
-claude.ai — no API costs. If you'd rather it call the Claude API directly
-and print the suggestions straight to your terminal (costs a small amount
-of usage credit per run, from console.anthropic.com):
+This prints a prompt for you to paste into a free chat at claude.ai — no
+API costs, ever. The advisor accounts for how many free transfers you
+currently have banked (computed from your transfer history — free
+transfers roll over, capped at 5) and only recommends a transfer beyond
+that allowance when the expected point gain over the next few gameweeks
+clearly outweighs the 4-point hit.
+
+### Transfers tab (`web/transfers`)
+
+The prompt also asks claude.ai to end its reply with a machine-readable
+` ```json ` block. Save that reply to a file and run:
 
 ```
-export ANTHROPIC_API_KEY="<your key from console.anthropic.com>"
-python -m fpl_pipeline.advisor --api
+python -m fpl_pipeline.advisor --apply <file>
 ```
+
+which parses the JSON block and writes it to the `advisor_suggestions`
+table, which the frontend's Transfers tab reads and renders. This is a
+manual, on-demand step — nothing calls the Claude API, so it costs
+nothing and there's no extra repo secret to configure. Re-run it whenever
+you want an updated suggestion (typically once a gameweek, after your
+squad's picked up its latest results).
