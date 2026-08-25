@@ -103,9 +103,16 @@ def build_full_prompt() -> str:
 
 def extract_suggestion(response_text: str) -> dict:
     match = re.search(r"```json\s*(\{.*?\})\s*```", response_text, re.DOTALL)
-    if not match:
-        raise ValueError("No ```json code block found in the pasted response.")
-    suggestion = json.loads(match.group(1))
+    if match:
+        suggestion = json.loads(match.group(1))
+    else:
+        # No fenced block — maybe the file is just the raw JSON object itself.
+        try:
+            suggestion = json.loads(response_text)
+        except json.JSONDecodeError:
+            raise ValueError(
+                "No ```json code block found, and the file isn't valid JSON on its own."
+            )
     missing = REQUIRED_SUGGESTION_KEYS - suggestion.keys()
     if missing:
         raise ValueError(f"Suggestion JSON is missing keys: {sorted(missing)}")
