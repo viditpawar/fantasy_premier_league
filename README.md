@@ -101,7 +101,11 @@ python -m fpl_pipeline.ingest.historical
 
 A real web app (`web/`) that queries Supabase directly from the browser/server
 (no Python backend involved) — a squad page with a live formation view, a
-dashboard (rank/points history, top scorers), and a transfer-suggestions page.
+dashboard (rank/points history, top scorers), a transfer-suggestions page,
+and a Leagues & Cups page listing every classic/head-to-head league you're
+in, with a standings table (your row highlighted) for each classic league.
+Head-to-head leagues are listed but don't get a standings table yet — their
+scoring model (match points, not total points) needs a different view.
 
 This only works because Row Level Security is enabled on every table with a
 public **read-only** policy for the `anon` role (see `schema.sql`) — the

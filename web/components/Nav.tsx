@@ -7,6 +7,7 @@ const LINKS = [
   { href: "/", label: "Squad" },
   { href: "/dashboard", label: "Dashboard" },
   { href: "/transfers", label: "Transfers" },
+  { href: "/leagues", label: "Leagues" },
 ];
 
 export function Nav() {
@@ -23,7 +24,7 @@ export function Nav() {
           My FPL
         </span>
         {LINKS.map((link) => {
-          const active = pathname === link.href;
+          const active = link.href === "/" ? pathname === "/" : pathname.startsWith(link.href);
           return (
             <Link
               key={link.href}
