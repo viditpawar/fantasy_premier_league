@@ -3,6 +3,9 @@ import {
   AdvisorSuggestion,
   Budget,
   GameweekHistoryPoint,
+  LeagueStandingRow,
+  LeagueType,
+  ManagerLeague,
   POSITION_NAMES,
   SquadPlayer,
   TopScorer,
@@ -260,6 +263,51 @@ export async function getAdvisorSuggestion(
     captaincyReasoning: suggestion.captaincy_reasoning,
     summary: suggestion.summary,
   };
+}
+
+export async function getManagerLeagues(
+  sb: SupabaseClient,
+  teamId: number,
+  season: string,
+): Promise<ManagerLeague[]> {
+  const { data, error } = await sb
+    .from("manager_leagues")
+    .select("league_id, league_name, league_type, entry_rank, entry_last_rank")
+    .eq("team_id", teamId)
+    .eq("season", season)
+    .order("league_type", { ascending: true })
+    .order("league_name", { ascending: true });
+  if (error) throw error;
+  return data.map((l) => ({
+    leagueId: l.league_id,
+    leagueName: l.league_name,
+    leagueType: l.league_type as LeagueType,
+    entryRank: l.entry_rank,
+    entryLastRank: l.entry_last_rank,
+  }));
+}
+
+export async function getLeagueStandings(
+  sb: SupabaseClient,
+  leagueId: number,
+  season: string,
+): Promise<LeagueStandingRow[]> {
+  const { data, error } = await sb
+    .from("league_standings")
+    .select("entry_team_id, entry_name, player_name, rank, last_rank, total, event_total")
+    .eq("league_id", leagueId)
+    .eq("season", season)
+    .order("rank", { ascending: true });
+  if (error) throw error;
+  return data.map((r) => ({
+    entryTeamId: r.entry_team_id,
+    entryName: r.entry_name,
+    playerName: r.player_name,
+    rank: r.rank,
+    lastRank: r.last_rank,
+    total: r.total,
+    eventTotal: r.event_total,
+  }));
 }
 
 export async function getGameweekHistory(
