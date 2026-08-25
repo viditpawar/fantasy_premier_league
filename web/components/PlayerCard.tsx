@@ -52,13 +52,16 @@ export function PlayerCard({ player }: { player: SquadPlayer }) {
         </span>
       )}
 
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={SHIRT_URL(player.teamCode)}
-        alt={`${player.team} shirt`}
-        className="mx-auto mb-1.5 h-11 w-11 object-contain drop-shadow-[0_4px_6px_rgba(0,0,0,0.35)] transition-transform duration-150 group-hover:-translate-y-1"
-        loading="lazy"
-      />
+      <div className="relative mx-auto mb-1.5 flex h-11 w-11 items-center justify-center">
+        <div className="absolute inset-0 scale-90 rounded-full bg-black/20 blur-sm transition-transform duration-200 group-hover:scale-100" />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={SHIRT_URL(player.teamCode)}
+          alt={`${player.team} shirt`}
+          className="relative h-11 w-11 object-contain drop-shadow-[0_4px_6px_rgba(0,0,0,0.35)] transition-transform duration-200 group-hover:-translate-y-1 group-hover:scale-105"
+          loading="lazy"
+        />
+      </div>
 
       <div className="rounded-t-lg bg-white/95 px-1.5 py-1 text-[11.5px] leading-tight shadow-sm backdrop-blur-sm transition-shadow group-hover:shadow-md">
         <div className="truncate font-bold text-slate-900">{player.player}</div>

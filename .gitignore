@@ -17,3 +17,5 @@ grafana/data/
 postgres-data/
 public/
 .DS_Store
+prompt.txt
+reply.txt

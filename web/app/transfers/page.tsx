@@ -1,6 +1,7 @@
 import { getSupabase } from "@/lib/supabase";
 import { getAdvisorSuggestion, getCurrentSeason, getTeamId } from "@/lib/queries";
 import { StatTile } from "@/components/StatTile";
+import { IconSwap, IconTrendingUp } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,7 @@ export default async function TransfersPage() {
   const suggestion = await getAdvisorSuggestion(sb, teamId, season);
 
   return (
-    <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-6">
+    <main className="animate-fade-in mx-auto w-full max-w-4xl flex-1 px-4 py-6">
       <header className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-2xl font-extrabold tracking-tight text-white">Transfer Suggestions</h1>
         {suggestion && (
@@ -38,8 +39,12 @@ export default async function TransfersPage() {
       ) : (
         <>
           <div className="mb-5 grid grid-cols-2 gap-2.5">
-            <StatTile label="Free transfers" value={String(suggestion.freeTransfers)} />
-            <StatTile label="Recommended transfers" value={String(suggestion.transfers.length)} />
+            <StatTile label="Free transfers" value={String(suggestion.freeTransfers)} icon={<IconTrendingUp className="h-4 w-4" />} />
+            <StatTile
+              label="Recommended transfers"
+              value={String(suggestion.transfers.length)}
+              icon={<IconSwap className="h-4 w-4" />}
+            />
           </div>
 
           <p className="card mb-5 px-4 py-3 text-sm leading-relaxed text-[var(--text-secondary)]">
@@ -55,7 +60,10 @@ export default async function TransfersPage() {
             ) : (
               <div className="flex flex-col gap-3">
                 {suggestion.transfers.map((t, i) => (
-                  <div key={i} className="card px-4 py-3.5">
+                  <div
+                    key={i}
+                    className="card px-4 py-3.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--border-hairline-strong)]"
+                  >
                     <div className="mb-1.5 flex flex-wrap items-center gap-2">
                       <PositionBadge position={t.position} />
                       <span className="font-semibold text-[var(--status-critical)] line-through decoration-2">
