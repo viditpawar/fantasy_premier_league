@@ -25,8 +25,11 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
   const inTable = Boolean(ownRow);
 
   return (
-    <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-6">
-      <Link href="/leagues" className="mb-3 inline-block text-sm text-[var(--text-secondary)] hover:text-white">
+    <main className="animate-fade-in mx-auto w-full max-w-4xl flex-1 px-4 py-6">
+      <Link
+        href="/leagues"
+        className="mb-3 inline-flex items-center gap-1 text-sm text-[var(--text-secondary)] transition-colors hover:text-white"
+      >
         ← Leagues & Cups
       </Link>
       <header className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
@@ -62,7 +65,7 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
             return (
               <div
                 key={r.entryTeamId}
-                className={`grid grid-cols-[auto_1fr_auto] items-center gap-x-3 px-4 py-2.5 text-sm ${
+                className={`grid grid-cols-[auto_1fr_auto] items-center gap-x-3 px-4 py-2.5 text-sm transition-colors hover:bg-white/[0.05] ${
                   isMe ? "bg-[var(--accent-green)]/10" : i % 2 === 1 ? "bg-white/[0.02]" : ""
                 }`}
                 style={isMe ? { boxShadow: "inset 3px 0 0 var(--accent-green)" } : undefined}
