@@ -42,3 +42,7 @@ class FPLClient:
     def entry_picks(self, team_id: int, event_id: int) -> dict:
         """A manager's squad picks and captain choice for a given gameweek."""
         return self._get(f"/entry/{team_id}/event/{event_id}/picks/")
+
+    def classic_league_standings(self, league_id: int, page: int = 1) -> dict:
+        """One page (≤50 entries) of a classic league's standings table."""
+        return self._get(f"/leagues-classic/{league_id}/standings/?page_standings={page}")

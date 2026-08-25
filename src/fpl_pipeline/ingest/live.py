@@ -261,8 +261,7 @@ def ingest_player_gameweek_stats(
         )
 
 
-def ingest_manager(conn: psycopg.Connection, season: str, client: FPLClient, team_id: int) -> None:
-    entry = client.entry(team_id)
+def ingest_manager(conn: psycopg.Connection, season: str, client: FPLClient, team_id: int, entry: dict) -> None:
     conn.cursor().execute(
         """
         INSERT INTO managers (team_id, name, player_first_name, player_last_name)
@@ -342,6 +341,52 @@ def ingest_manager(conn: psycopg.Connection, season: str, client: FPLClient, tea
         )
 
 
+def ingest_leagues(conn: psycopg.Connection, season: str, client: FPLClient, team_id: int, entry: dict) -> None:
+    league_rows = [
+        (team_id, season, league["id"], league["name"], league_type, league.get("entry_rank"), league.get("entry_last_rank"))
+        for league_type in ("classic", "h2h")
+        for league in entry["leagues"][league_type]
+    ]
+    conn.cursor().executemany(
+        """
+        INSERT INTO manager_leagues (team_id, season, league_id, league_name,
+            league_type, entry_rank, entry_last_rank)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (team_id, season, league_id) DO UPDATE SET
+            league_name = EXCLUDED.league_name,
+            league_type = EXCLUDED.league_type,
+            entry_rank = EXCLUDED.entry_rank,
+            entry_last_rank = EXCLUDED.entry_last_rank
+        """,
+        league_rows,
+    )
+
+    for league in entry["leagues"]["classic"]:
+        league_id = league["id"]
+        results = []
+        page = 1
+        while page <= 3:
+            standings = client.classic_league_standings(league_id, page)["standings"]
+            results.extend(standings["results"])
+            if not standings["has_next"]:
+                break
+            page += 1
+
+        conn.cursor().execute("DELETE FROM league_standings WHERE season = %s AND league_id = %s", (season, league_id))
+        rows = [
+            (season, league_id, r["entry"], r["entry_name"], r["player_name"], r["rank"], r["last_rank"], r["total"], r.get("event_total"))
+            for r in results
+        ]
+        conn.cursor().executemany(
+            """
+            INSERT INTO league_standings (season, league_id, entry_team_id,
+                entry_name, player_name, rank, last_rank, total, event_total)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            rows,
+        )
+
+
 def run_full_ingest() -> None:
     season = current_season()
     client = FPLClient()
@@ -355,7 +400,10 @@ def run_full_ingest() -> None:
         ingest_fixtures(conn, season, fixtures)
         ingest_player_gameweek_stats(conn, season, client, bootstrap, fixtures)
         if FPL_TEAM_ID:
-            ingest_manager(conn, season, client, int(FPL_TEAM_ID))
+            team_id = int(FPL_TEAM_ID)
+            entry = client.entry(team_id)
+            ingest_manager(conn, season, client, team_id, entry)
+            ingest_leagues(conn, season, client, team_id, entry)
         conn.commit()
 
 

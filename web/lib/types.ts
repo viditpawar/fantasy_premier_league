@@ -74,3 +74,23 @@ export interface AdvisorSuggestion {
   captaincyReasoning: string;
   summary: string;
 }
+
+export type LeagueType = "classic" | "h2h";
+
+export interface ManagerLeague {
+  leagueId: number;
+  leagueName: string;
+  leagueType: LeagueType;
+  entryRank: number | null;
+  entryLastRank: number | null;
+}
+
+export interface LeagueStandingRow {
+  entryTeamId: number;
+  entryName: string;
+  playerName: string;
+  rank: number;
+  lastRank: number;
+  total: number;
+  eventTotal: number | null;
+}

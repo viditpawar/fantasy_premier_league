@@ -157,6 +157,35 @@ CREATE TABLE IF NOT EXISTS advisor_suggestions (
     PRIMARY KEY (team_id, season, for_gameweek)
 );
 
+-- Every classic/h2h league the manager belongs to, with their own current
+-- and previous rank in it (from the FPL entry endpoint).
+CREATE TABLE IF NOT EXISTS manager_leagues (
+    team_id INT NOT NULL REFERENCES managers (team_id),
+    season TEXT NOT NULL,
+    league_id INT NOT NULL,
+    league_name TEXT NOT NULL,
+    league_type TEXT NOT NULL,
+    entry_rank INT,
+    entry_last_rank INT,
+    PRIMARY KEY (team_id, season, league_id)
+);
+
+-- Standings snapshot (top pages only) for classic leagues. Head-to-head
+-- leagues aren't populated here (different scoring model) — they still
+-- appear in manager_leagues, just without a standings table.
+CREATE TABLE IF NOT EXISTS league_standings (
+    season TEXT NOT NULL,
+    league_id INT NOT NULL,
+    entry_team_id INT NOT NULL,
+    entry_name TEXT,
+    player_name TEXT,
+    rank INT,
+    last_rank INT,
+    total INT,
+    event_total INT,
+    PRIMARY KEY (season, league_id, entry_team_id)
+);
+
 -- Public read-only access for the frontend (Supabase anon key). The ingest
 -- job connects as the table owner, which bypasses RLS, so this only
 -- restricts anonymous/frontend access, never the pipeline itself. Only
@@ -170,7 +199,7 @@ BEGIN
     IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
         FOR t IN SELECT unnest(ARRAY['teams', 'players', 'gameweeks', 'fixtures',
             'player_gameweek_stats', 'managers', 'manager_gameweek_history', 'manager_picks',
-            'advisor_suggestions'])
+            'advisor_suggestions', 'manager_leagues', 'league_standings'])
         LOOP
             EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
             EXECUTE format('DROP POLICY IF EXISTS public_read ON %I', t);
