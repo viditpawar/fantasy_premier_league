@@ -60,7 +60,6 @@ export interface SuggestedTransfer {
   player_out: string;
   player_in: string;
   position: Position;
-  costs_points: boolean;
   reasoning: string;
 }
 
@@ -68,7 +67,8 @@ export interface AdvisorSuggestion {
   forGameweek: number;
   freeTransfers: number;
   generatedAt: string;
-  transfers: SuggestedTransfer[];
+  recommendedTransfers: SuggestedTransfer[];
+  hitTransfers: SuggestedTransfer[];
   captain: string;
   viceCaptain: string;
   captaincyReasoning: string;

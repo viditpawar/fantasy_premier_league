@@ -2,6 +2,7 @@ import { getSupabase } from "@/lib/supabase";
 import { getAdvisorSuggestion, getCurrentSeason, getTeamId } from "@/lib/queries";
 import { StatTile } from "@/components/StatTile";
 import { IconSwap, IconTrendingUp } from "@/components/icons";
+import { SuggestedTransfer } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,61 @@ function PositionBadge({ position }: { position: string }) {
     >
       {position}
     </span>
+  );
+}
+
+function RankBadge({ rank }: { rank: number }) {
+  const isTop = rank === 1;
+  return (
+    <span
+      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-extrabold"
+      style={
+        isTop
+          ? { background: "var(--accent-green)", color: "#06210f", boxShadow: "0 0 0 3px rgba(0,255,133,0.18)" }
+          : { background: "rgba(255,255,255,0.08)", color: "var(--text-secondary)" }
+      }
+      title={isTop ? "Top pick — make this one" : "Backup option"}
+    >
+      {rank}
+    </span>
+  );
+}
+
+function TransferCard({
+  transfer,
+  rank,
+  hit,
+}: {
+  transfer: SuggestedTransfer;
+  rank?: number;
+  hit?: boolean;
+}) {
+  return (
+    <div
+      className="card px-4 py-3.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--border-hairline-strong)]"
+      style={rank === 1 ? { boxShadow: "inset 3px 0 0 var(--accent-green), var(--shadow-card)" } : undefined}
+    >
+      <div className="mb-1.5 flex flex-wrap items-center gap-2">
+        {rank != null && <RankBadge rank={rank} />}
+        <PositionBadge position={transfer.position} />
+        <span className="font-semibold text-[var(--status-critical)] line-through decoration-2">
+          {transfer.player_out}
+        </span>
+        <span className="text-[var(--text-muted)]">→</span>
+        <span className="font-bold" style={{ color: "var(--status-good)" }}>
+          {transfer.player_in}
+        </span>
+        {hit && (
+          <span
+            className="ml-auto rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-900"
+            style={{ background: "var(--status-warning)" }}
+          >
+            -4 pts
+          </span>
+        )}
+      </div>
+      <p className="text-sm text-[var(--text-secondary)]">{transfer.reasoning}</p>
+    </div>
   );
 }
 
@@ -41,8 +97,8 @@ export default async function TransfersPage() {
           <div className="mb-5 grid grid-cols-2 gap-2.5">
             <StatTile label="Free transfers" value={String(suggestion.freeTransfers)} icon={<IconTrendingUp className="h-4 w-4" />} />
             <StatTile
-              label="Recommended transfers"
-              value={String(suggestion.transfers.length)}
+              label="Ranked ideas"
+              value={String(suggestion.recommendedTransfers.length)}
               icon={<IconSwap className="h-4 w-4" />}
             />
           </div>
@@ -52,38 +108,34 @@ export default async function TransfersPage() {
           </p>
 
           <section className="mb-6">
-            <h2 className="mb-2 section-label">Suggested transfers</h2>
-            {suggestion.transfers.length === 0 ? (
+            <h2 className="mb-1 section-label">Free transfer — ranked options</h2>
+            <p className="mb-2 text-xs text-[var(--text-muted)]">
+              Only #1 fits your free transfer{suggestion.freeTransfers === 1 ? "" : "s"} — the rest are backups in
+              case prices move or a player's status changes before the deadline.
+            </p>
+            {suggestion.recommendedTransfers.length === 0 ? (
               <div className="card px-4 py-4 text-sm text-[var(--text-secondary)]">
-                No transfers recommended this week.
+                No transfer recommended this week — hold your squad.
               </div>
             ) : (
               <div className="flex flex-col gap-3">
-                {suggestion.transfers.map((t, i) => (
-                  <div
-                    key={i}
-                    className="card px-4 py-3.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--border-hairline-strong)]"
-                  >
-                    <div className="mb-1.5 flex flex-wrap items-center gap-2">
-                      <PositionBadge position={t.position} />
-                      <span className="font-semibold text-[var(--status-critical)] line-through decoration-2">
-                        {t.player_out}
-                      </span>
-                      <span className="text-[var(--text-muted)]">→</span>
-                      <span className="font-bold" style={{ color: "var(--status-good)" }}>
-                        {t.player_in}
-                      </span>
-                      {t.costs_points && (
-                        <span
-                          className="ml-auto rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-900"
-                          style={{ background: "var(--status-warning)" }}
-                        >
-                          -4 pts
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm text-[var(--text-secondary)]">{t.reasoning}</p>
-                  </div>
+                {suggestion.recommendedTransfers.map((t, i) => (
+                  <TransferCard key={i} transfer={t} rank={i + 1} />
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="mb-6">
+            <h2 className="mb-1 section-label">Worth a -4 hit?</h2>
+            {suggestion.hitTransfers.length === 0 ? (
+              <div className="card px-4 py-4 text-sm text-[var(--text-secondary)]">
+                No transfer is clearly worth paying 4 points for right now.
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {suggestion.hitTransfers.map((t, i) => (
+                  <TransferCard key={i} transfer={t} hit />
                 ))}
               </div>
             )}

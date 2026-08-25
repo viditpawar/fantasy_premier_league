@@ -246,7 +246,8 @@ export async function getAdvisorSuggestion(
   if (!data) return null;
 
   const suggestion = data.suggestion as {
-    transfers: AdvisorSuggestion["transfers"];
+    recommended_transfers: AdvisorSuggestion["recommendedTransfers"];
+    hit_transfers: AdvisorSuggestion["hitTransfers"];
     captain: string;
     vice_captain: string;
     captaincy_reasoning: string;
@@ -257,7 +258,8 @@ export async function getAdvisorSuggestion(
     forGameweek: data.for_gameweek,
     freeTransfers: data.free_transfers,
     generatedAt: data.generated_at,
-    transfers: suggestion.transfers,
+    recommendedTransfers: suggestion.recommended_transfers ?? [],
+    hitTransfers: suggestion.hit_transfers ?? [],
     captain: suggestion.captain,
     viceCaptain: suggestion.vice_captain,
     captaincyReasoning: suggestion.captaincy_reasoning,

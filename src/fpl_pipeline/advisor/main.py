@@ -29,19 +29,21 @@ list of in-form alternative players at each position with their prices.
 
 The manager has a limited number of free transfers (given as \
 `free_transfers`). Each transfer beyond that number costs 4 points off \
-their total score for the gameweek. Only recommend a transfer beyond the \
-free allowance if the expected point gain over the next few gameweeks \
-clearly outweighs the 4-point hit — say so explicitly when a transfer \
-costs points, and default to recommending at most `free_transfers` \
-transfers otherwise. A transfer must also fit the budget: the incoming \
-player's price must be no more than the outgoing player's price plus bank.
+their total score for the gameweek. A transfer must also fit the budget: \
+the incoming player's price must be no more than the outgoing player's \
+price plus bank.
 
 Recommend:
-1. Any transfers worth making before the next gameweek deadline (or say \
-   none are needed), with the specific player in and player out, and \
-   reasoning grounded in the data provided (form, fixtures, price, \
-   availability status, and whether it costs points).
-2. A captain and vice-captain pick for the next gameweek, with reasoning.
+1. Up to 3 transfer ideas that each fit within the free transfers the \
+   manager already has banked (no point cost), ranked best first — the \
+   manager will only actually make the top one now, the rest are backup \
+   options in case a price rises or a player's status changes before the \
+   deadline. Leave this empty if no transfer is worth making at all.
+2. Separately, any transfer that goes beyond the free allowance and costs \
+   4 points — include one here ONLY if the expected point gain over the \
+   next few gameweeks clearly outweighs the hit. Leave this empty in the \
+   (much more common) case that no transfer is clearly worth paying for.
+3. A captain and vice-captain pick for the next gameweek, with reasoning.
 
 Be concise and specific. Only recommend transfers clearly supported by the \
 data — do not invent information not present in the context. Flag any \
@@ -54,12 +56,19 @@ fenced ```json code block (and nothing else in that block), matching \
 exactly this shape:
 
 {
-  "transfers": [
+  "recommended_transfers": [
     {
       "player_out": "...",
       "player_in": "...",
       "position": "GKP" | "DEF" | "MID" | "FWD",
-      "costs_points": true | false,
+      "reasoning": "..."
+    }
+  ],
+  "hit_transfers": [
+    {
+      "player_out": "...",
+      "player_in": "...",
+      "position": "GKP" | "DEF" | "MID" | "FWD",
       "reasoning": "..."
     }
   ],
@@ -69,12 +78,16 @@ exactly this shape:
   "summary": "one or two sentence overall summary"
 }
 
-`transfers` is an empty list if none are recommended. Use the exact \
-player web names from the squad/candidate data given.
+`recommended_transfers` holds up to 3 free-transfer ideas, ranked best \
+first (index 0 = the one to actually make). `hit_transfers` holds only \
+transfers you'd recommend paying 4 points for — leave it an empty list \
+unless one is clearly worth it. Both are empty lists if nothing applies. \
+Use the exact player web names from the squad/candidate data given.
 """
 
 REQUIRED_SUGGESTION_KEYS = {
-    "transfers",
+    "recommended_transfers",
+    "hit_transfers",
     "captain",
     "vice_captain",
     "captaincy_reasoning",
