@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getSupabase } from "@/lib/supabase";
 import { getCurrentSeason, getManagerLeagues, getTeamId } from "@/lib/queries";
 import { ManagerLeague } from "@/lib/types";
+import { IconShield } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 
@@ -31,8 +32,14 @@ function RankDelta({ league }: { league: ManagerLeague }) {
 
 function LeagueRow({ league }: { league: ManagerLeague }) {
   const content = (
-    <div className="card flex items-center justify-between gap-3 px-4 py-3.5 transition-colors hover:border-[var(--border-hairline-strong)]">
-      <div className="min-w-0">
+    <div className="card flex items-center gap-3 px-4 py-3.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--border-hairline-strong)]">
+      <div
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+        style={{ background: "rgba(122, 10, 134, 0.18)", color: "var(--accent-purple-bright)" }}
+      >
+        <IconShield className="h-5 w-5" />
+      </div>
+      <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="truncate font-semibold text-white">{league.leagueName}</span>
           <span
@@ -70,7 +77,7 @@ export default async function LeaguesPage() {
   const h2h = leagues.filter((l) => l.leagueType === "h2h");
 
   return (
-    <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-6">
+    <main className="animate-fade-in mx-auto w-full max-w-4xl flex-1 px-4 py-6">
       <header className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-2xl font-extrabold tracking-tight text-white">Leagues & Cups</h1>
         <span className="text-sm text-[var(--text-secondary)]">Season {season}</span>

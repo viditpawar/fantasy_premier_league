@@ -8,6 +8,7 @@ import {
   getTopScorers,
 } from "@/lib/queries";
 import { StatTile } from "@/components/StatTile";
+import { IconPiggyBank, IconTrendingUp, IconTrophy, IconWallet } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 
@@ -31,8 +32,10 @@ export default async function DashboardPage() {
   const maxPoints = Math.max(...history.map((h) => h.points), 1);
   const chartHeight = 140;
 
+  const iconClass = "h-4 w-4";
+
   return (
-    <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-6">
+    <main className="animate-fade-in mx-auto w-full max-w-4xl flex-1 px-4 py-6">
       <header className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-2xl font-extrabold tracking-tight text-white">Dashboard</h1>
         <span className="text-sm text-[var(--text-secondary)]">
@@ -41,10 +44,14 @@ export default async function DashboardPage() {
       </header>
 
       <div className="mb-6 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-        <StatTile label="Total points" value={String(budget.totalPoints)} />
-        <StatTile label="Overall rank" value={budget.overallRank ? budget.overallRank.toLocaleString() : "-"} />
-        <StatTile label="Squad value" value={`£${(budget.teamValue / 10).toFixed(1)}m`} />
-        <StatTile label="In the bank" value={`£${(budget.bank / 10).toFixed(1)}m`} />
+        <StatTile label="Total points" value={String(budget.totalPoints)} icon={<IconTrophy className={iconClass} />} />
+        <StatTile
+          label="Overall rank"
+          value={budget.overallRank ? budget.overallRank.toLocaleString() : "-"}
+          icon={<IconTrendingUp className={iconClass} />}
+        />
+        <StatTile label="Squad value" value={`£${(budget.teamValue / 10).toFixed(1)}m`} icon={<IconWallet className={iconClass} />} />
+        <StatTile label="In the bank" value={`£${(budget.bank / 10).toFixed(1)}m`} icon={<IconPiggyBank className={iconClass} />} />
       </div>
 
       <section className="mb-6">
@@ -101,7 +108,7 @@ export default async function DashboardPage() {
           {topScorers.map((p, i) => (
             <div
               key={i}
-              className={`grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-x-3 px-4 py-2.5 text-sm ${
+              className={`grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-x-3 px-4 py-2.5 text-sm transition-colors hover:bg-white/[0.05] ${
                 i % 2 === 1 ? "bg-white/[0.02]" : ""
               }`}
             >
