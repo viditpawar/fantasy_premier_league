@@ -2,9 +2,36 @@
 
 # Fantasy Premier League Pipeline
 
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Python](https://img.shields.io/badge/python-3.11%2B-blue)
+![Next.js](https://img.shields.io/badge/frontend-Next.js-black)
+
 A data pipeline for Fantasy Premier League: ingest live FPL API data and historical
-season data into Postgres, then consume it through a Grafana dashboard and an
-LLM-based transfer/captaincy advisor.
+season data into Postgres, then consume it through a live web frontend, a Grafana
+dashboard, and an LLM-based transfer/captaincy advisor.
+
+## Contents
+
+- [Features](#features)
+- [Architecture](#architecture)
+- [Local development](#local-development)
+- [Production setup (Supabase + GitHub Actions)](#production-setup-supabase--github-actions)
+- [Frontend (Next.js on Vercel)](#frontend-nextjs-on-vercel)
+- [AI advisor](#ai-advisor)
+
+## Features
+
+- **Squad** — live formation view of your current squad: captain/vice-captain,
+  injury/suspension flags, next-fixture difficulty, points per player.
+- **Dashboard** — season points history, overall rank, and top scorers.
+- **Transfers** — an AI-generated shortlist of transfer ideas each gameweek:
+  up to 3 ranked free-transfer options (best one highlighted) plus a
+  separate call on whether any transfer is worth a -4 point hit, and a
+  captain/vice-captain pick.
+- **Leagues & Cups** — every classic and head-to-head league you're in, with
+  your rank and its change since last gameweek; classic leagues also get a
+  full standings table with your row highlighted.
+- **Grafana dashboard** — an alternate view of the same warehouse for local/self-hosted use.
 
 ## Architecture
 
@@ -127,8 +154,8 @@ npm install
 npm run dev
 ```
 
-Visit http://localhost:3000 (squad), http://localhost:3000/dashboard, and
-http://localhost:3000/transfers (AI transfer suggestions — see below).
+Visit http://localhost:3000 (squad), `/dashboard`, `/transfers` (AI transfer
+suggestions — see below), and `/leagues` (your classic/H2H league standings).
 
 ### Deploy to Vercel
 
@@ -154,11 +181,15 @@ python -m fpl_pipeline.advisor
 This prints a prompt for you to paste into a free chat at claude.ai — no
 API costs, ever. The advisor accounts for how many free transfers you
 currently have banked (computed from your transfer history — free
-transfers roll over, capped at 5) and only recommends a transfer beyond
-that allowance when the expected point gain over the next few gameweeks
-clearly outweighs the 4-point hit.
+transfers roll over, capped at 5) and asks for:
 
-### Transfers tab (`web/transfers`)
+- Up to 3 ranked free-transfer ideas (best one first — the rest are backups
+  in case a price rises or a player's status changes before the deadline)
+- A separate call on whether *any* transfer is worth paying a 4-point hit
+  for, populated only when the expected gain clearly outweighs the cost
+- A captain and vice-captain pick, with reasoning
+
+### Transfers page (`web/transfers`)
 
 The prompt also asks claude.ai to end its reply with a machine-readable
 ` ```json ` block. Save that reply to a file and run:
