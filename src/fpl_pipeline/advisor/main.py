@@ -33,21 +33,59 @@ their total score for the gameweek. A transfer must also fit the budget: \
 the incoming player's price must be no more than the outgoing player's \
 price plus bank.
 
+## Deterministic scoring method — follow exactly, do not substitute judgment
+
+This is a mechanical calculation, not a creative task. Two runs over the \
+same data must produce the same ranking. Do not weigh "gut feel", team \
+reputation, or anything not listed below.
+
+Step 1 — Flag replacement need, in this strict priority order:
+  a. `status` isn't 'a' (injured/suspended/on loan/unavailable) — always \
+     flag, regardless of form.
+  b. `chance_of_playing_next_round` is not null and < 75 — always flag.
+  c. 0 minutes in the most recent gameweek of `recent_form` — flag as a \
+     rotation-risk concern (lower priority than a/b).
+  d. Otherwise, a player is only a replacement candidate if their \
+     `recent_form` score (Step 2) is the lowest on the squad at their \
+     position AND at least 4 points below the best available candidate's \
+     score (Step 2) at that position.
+  Rank flagged players a > b > c > d; only consider replacing the \
+  highest-priority flagged player(s) first.
+
+Step 2 — Score every player (squad player being replaced, and every \
+candidate) with this exact formula:
+  score = sum(recent_form points, last 5 GWs, most recent GW counted \
+  twice) − (average next-3-fixture difficulty × 3)
+  Show this score for the outgoing player and every candidate you compare \
+  in your reasoning.
+
+Step 3 — Candidate selection: among transfer_candidates at the same \
+position as the outgoing player, keep only those whose price ≤ outgoing \
+player's price + bank. Rank the remainder strictly by score (Step 2), \
+highest first. On a tie, prefer the cheaper player; if still tied, prefer \
+the player with the easier (lower) next fixture difficulty.
+
+Step 4 — Captain/vice-captain: score every available (`status` == 'a') \
+squad player with Step 2's formula but using next 1 fixture difficulty \
+only (not average of 3), doubled instead of ×3. Captain = highest score; \
+vice-captain = second highest. On a tie, prefer the player with the \
+easier next fixture.
+
 Recommend:
 1. Up to 3 transfer ideas that each fit within the free transfers the \
-   manager already has banked (no point cost), ranked best first — the \
-   manager will only actually make the top one now, the rest are backup \
-   options in case a price rises or a player's status changes before the \
-   deadline. Leave this empty if no transfer is worth making at all.
+   manager already has banked (no point cost), in the exact rank order \
+   from Step 3 — the manager will only actually make the top one now, the \
+   rest are backup options in case a price rises or a player's status \
+   changes before the deadline. Leave this empty only if Step 1 flags no \
+   one.
 2. Separately, any transfer that goes beyond the free allowance and costs \
-   4 points — include one here ONLY if the expected point gain over the \
-   next few gameweeks clearly outweighs the hit. Leave this empty in the \
-   (much more common) case that no transfer is clearly worth paying for.
-3. A captain and vice-captain pick for the next gameweek, with reasoning.
+   4 points — include one here ONLY if its Step 2 score gain over 4 \
+   gameweeks (score_in − score_out, projected × 4) exceeds 4. Leave this \
+   empty in the (much more common) case that no transfer clears that bar.
+3. The captain and vice-captain from Step 4, with their scores shown.
 
-Be concise and specific. Only recommend transfers clearly supported by the \
-data — do not invent information not present in the context. Flag any \
-squad player whose `status` isn't 'a' (available) as a priority concern.
+Be concise. Only use data present in the context — never invent stats, \
+injury news, or fixtures not given to you.
 """
 
 SUGGESTION_JSON_INSTRUCTIONS = """\
