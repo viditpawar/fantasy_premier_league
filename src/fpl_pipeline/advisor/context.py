@@ -159,7 +159,7 @@ def get_transfer_candidates(
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(
             """
-            select p.web_name as player, t.short_name as team,
+            select p.web_name as player, t.short_name as team, p.team_id, p.code as player_code,
                 round(p.now_cost / 10.0, 1) as price,
                 sum(s.total_points) as recent_points
             from player_gameweek_stats s
@@ -169,7 +169,7 @@ def get_transfer_candidates(
                 and s.gameweek > (select max(gameweek) - %(last_n)s from player_gameweek_stats where season = %(season)s)
                 and not (p.code = any(%(exclude_codes)s))
                 and p.status = 'a'
-            group by p.web_name, t.short_name, p.now_cost
+            group by p.web_name, t.short_name, p.team_id, p.code, p.now_cost
             order by recent_points desc
             limit %(limit)s
             """,
@@ -184,6 +184,36 @@ def get_transfer_candidates(
         return cur.fetchall()
 
 
+def compute_form_score(recent_form: list[dict]) -> float:
+    """Last-N gameweek points, most recent gameweek weighted double."""
+    weights = [2] + [1] * (len(recent_form) - 1)
+    return float(sum(w * gw["total_points"] for w, gw in zip(weights, recent_form)))
+
+
+def avg_upcoming_difficulty(fixtures: list[dict], n: int = 3) -> float | None:
+    diffs = [f["difficulty"] for f in fixtures[:n]]
+    return sum(diffs) / len(diffs) if diffs else None
+
+
+def compute_score(recent_form: list[dict], fixtures: list[dict]) -> float:
+    """Step-2 rubric score: form (last 5 GW, most recent doubled) minus
+    average next-3-fixture difficulty x3. Computed here, not by the LLM, so
+    the advisor never has to invent numbers it wasn't given.
+    """
+    form = compute_form_score(recent_form)
+    avg_diff = avg_upcoming_difficulty(fixtures, n=3)
+    return round(form - (avg_diff * 3 if avg_diff is not None else 0.0), 1)
+
+
+def compute_captain_score(recent_form: list[dict], fixtures: list[dict]) -> float:
+    """Step-4 rubric score: form (same weighting) minus next-1-fixture
+    difficulty x2.
+    """
+    form = compute_form_score(recent_form)
+    next_diff = fixtures[0]["difficulty"] if fixtures else None
+    return round(form - (next_diff * 2 if next_diff is not None else 0.0), 1)
+
+
 def build_context(conn: psycopg.Connection) -> dict:
     season = get_current_season(conn)
     team_id = get_team_id(conn)
@@ -191,16 +221,6 @@ def build_context(conn: psycopg.Connection) -> dict:
 
     squad = get_squad(conn, team_id, season, gameweek)
     player_codes = [p["player_code"] for p in squad]
-    team_ids = [p["team_id"] for p in squad]
-
-    form = get_recent_form(conn, season, player_codes)
-    fixtures = get_upcoming_fixtures(conn, season, team_ids)
-    budget = get_budget(conn, team_id, season, gameweek)
-    free_transfers = get_free_transfers(conn, team_id, season, gameweek)
-
-    for player in squad:
-        player["recent_form"] = form.get(player["player_code"], [])
-        player["upcoming_fixtures"] = fixtures.get(player["team_id"], [])
 
     candidates = {
         POSITION_NAMES[element_type]: get_transfer_candidates(
@@ -208,6 +228,31 @@ def build_context(conn: psycopg.Connection) -> dict:
         )
         for element_type in POSITION_NAMES
     }
+    all_candidates = [c for group in candidates.values() for c in group]
+
+    # Fetch form/fixtures for squad AND candidates together so every score
+    # in the prompt is computed here, in Python, from real data — the LLM
+    # is never asked to invent a fixture difficulty or form number.
+    all_codes = player_codes + [c["player_code"] for c in all_candidates]
+    all_team_ids = [p["team_id"] for p in squad] + [c["team_id"] for c in all_candidates]
+
+    form = get_recent_form(conn, season, all_codes)
+    fixtures = get_upcoming_fixtures(conn, season, all_team_ids)
+    budget = get_budget(conn, team_id, season, gameweek)
+    free_transfers = get_free_transfers(conn, team_id, season, gameweek)
+
+    for player in squad:
+        player["recent_form"] = form.get(player["player_code"], [])
+        player["upcoming_fixtures"] = fixtures.get(player["team_id"], [])
+        player["score"] = compute_score(player["recent_form"], player["upcoming_fixtures"])
+        player["captain_score"] = compute_captain_score(player["recent_form"], player["upcoming_fixtures"])
+
+    for candidate in all_candidates:
+        candidate["recent_form"] = form.get(candidate["player_code"], [])
+        candidate["upcoming_fixtures"] = fixtures.get(candidate["team_id"], [])
+        candidate["score"] = compute_score(candidate["recent_form"], candidate["upcoming_fixtures"])
+
+    _flag_replacement_candidates(squad, candidates)
 
     return {
         "season": season,
@@ -218,3 +263,36 @@ def build_context(conn: psycopg.Connection) -> dict:
         "squad": squad,
         "transfer_candidates": candidates,
     }
+
+
+def _flag_replacement_candidates(squad: list[dict], candidates: dict[str, list[dict]]) -> None:
+    """Sets `flag` on each squad player per the Step-1 rubric priority
+    order (a > b > c > d), computed here instead of left for the LLM to
+    judge — the highest-priority flag reason wins.
+    """
+    for player in squad:
+        if player["status"] != "a":
+            player["flag"] = "a_unavailable_status"
+        elif player["chance_of_playing_next_round"] is not None and player["chance_of_playing_next_round"] < 75:
+            player["flag"] = "b_low_chance_of_playing"
+        elif player["recent_form"] and player["recent_form"][0]["minutes"] == 0:
+            player["flag"] = "c_zero_minutes_last_gw"
+        else:
+            player["flag"] = None
+
+    by_position: dict[str, list[dict]] = {}
+    for player in squad:
+        by_position.setdefault(player["position"], []).append(player)
+
+    for position, players in by_position.items():
+        best_candidate_score = max(
+            (c["score"] for c in candidates.get(position, [])), default=None
+        )
+        if best_candidate_score is None:
+            continue
+        unflagged = [p for p in players if p["flag"] is None]
+        if not unflagged:
+            continue
+        worst = min(unflagged, key=lambda p: p["score"])
+        if best_candidate_score - worst["score"] >= 4:
+            worst["flag"] = "d_low_form_vs_best_candidate"
