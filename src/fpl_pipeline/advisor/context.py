@@ -271,18 +271,23 @@ def _flag_replacement_candidates(squad: list[dict], candidates: dict[str, list[d
     judge — the highest-priority flag reason wins.
     """
     for player in squad:
+        starting = player["multiplier"] > 0
         if player["status"] != "a":
             player["flag"] = "a_unavailable_status"
         elif player["chance_of_playing_next_round"] is not None and player["chance_of_playing_next_round"] < 75:
             player["flag"] = "b_low_chance_of_playing"
-        elif player["recent_form"] and player["recent_form"][0]["minutes"] == 0:
+        elif starting and player["recent_form"] and player["recent_form"][0]["minutes"] == 0:
+            # 0 minutes only matters as a rotation-risk signal for players
+            # who were actually selected to start — a bench player sitting
+            # out costs nothing directly (multiplier 0).
             player["flag"] = "c_zero_minutes_last_gw"
         else:
             player["flag"] = None
 
     by_position: dict[str, list[dict]] = {}
     for player in squad:
-        by_position.setdefault(player["position"], []).append(player)
+        if player["multiplier"] > 0:
+            by_position.setdefault(player["position"], []).append(player)
 
     for position, players in by_position.items():
         best_candidate_score = max(

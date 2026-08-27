@@ -35,8 +35,10 @@ estimate one yourself:
   `b_low_chance_of_playing` (chance_of_playing_next_round < 75), \
   `c_zero_minutes_last_gw` (rotation risk), or \
   `d_low_form_vs_best_candidate` (weakest scorer at their position, well \
-  behind the best available replacement). These are already priority- \
-  ordered a > b > c > d.
+  behind the best available replacement). `c` and `d` are only ever set \
+  on starting-XI players (`multiplier` > 0) — a benched player (multiplier \
+  0) costs nothing directly, so a bench player's poor form/zero minutes \
+  is never flagged. These are already priority-ordered a > b > c > d.
 - `score`: last-5-gameweek form (most recent gameweek weighted double) \
   minus (average next-3-fixture difficulty × 3). Higher is better. This \
   is already computed from real data — trust it exactly as given.
@@ -54,8 +56,9 @@ price plus bank.
 Two runs over the same data must produce the same picks.
 
 1. Only consider squad players with a non-null `flag`, highest priority \
-   first (a, then b, then c, then d). If none are flagged, recommend no \
-   transfer.
+   first (a, then b, then c, then d). Within the same flag letter, order \
+   by `score` ascending (worst first — the bigger problem is more urgent). \
+   If none are flagged, recommend no transfer.
 2. For the highest-priority flagged player, look at `transfer_candidates` \
    at the same position. Keep only those priced ≤ outgoing player's price \
    + bank. Rank the rest by `score` descending; tie-break by cheaper \
@@ -63,11 +66,23 @@ Two runs over the same data must produce the same picks.
 3. Repeat for the next flagged player (if any) to build up to 3 ranked \
    free-transfer ideas, best first.
 4. For a -4 hit transfer: only include one if (candidate `score` − \
-   outgoing player's `score`) × 4 exceeds 4 points — i.e. the score gap \
-   itself must exceed 1. Leave empty otherwise (the common case).
+   outgoing player's `score`) exceeds 5 (i.e. projected gain over 4 \
+   gameweeks would clear the 4-point cost several times over, not just \
+   barely). This is intentionally a high bar — leave it empty in the \
+   common case that no swap clears it.
 5. Captain = highest `captain_score` among squad players with `flag` not \
    `a_unavailable_status`/`b_low_chance_of_playing`; vice-captain = \
    second highest. Tie-break by lower next-fixture difficulty.
+
+## Early-season caution
+
+If a squad or candidate player's `recent_form` has fewer than 3 \
+gameweeks of history, their `score` is based on very little data and is \
+noisy — say so explicitly in the reasoning for any transfer idea or \
+captain pick that relies on such a player, and treat it as a weaker \
+signal than a `score` built from 3+ gameweeks. Still follow the \
+mechanical ranking (don't override it), but flag the low-confidence \
+caveat in your written explanation.
 
 Be concise. Cite the exact `score`/`flag`/`minutes` values from the data \
 in your reasoning — never invent or restate them differently.
