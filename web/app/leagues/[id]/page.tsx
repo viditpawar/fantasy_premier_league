@@ -1,12 +1,36 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getSupabase } from "@/lib/supabase";
-import { getCurrentSeason, getLeagueStandings, getManagerLeagues, getTeamId } from "@/lib/queries";
+import {
+  getCurrentSeason,
+  getLeagueRivals,
+  getLeagueStandings,
+  getManagerLeagues,
+  getTeamId,
+} from "@/lib/queries";
+import { LeagueStandingsTable } from "@/components/LeagueStandingsTable";
+import { SectionHeader } from "@/components/ui/SectionHeader";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { IconArrowLeft } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 
-export default async function LeagueDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+export async function generateMetadata(props: PageProps<"/leagues/[id]">): Promise<Metadata> {
+  const { id } = await props.params;
+  const sb = getSupabase();
+  const season = await getCurrentSeason(sb).catch(() => null);
+  if (!season) return { title: "League" };
+  const teamId = await getTeamId(sb).catch(() => null);
+  if (!teamId) return { title: "League" };
+  const leagues = await getManagerLeagues(sb, teamId, season).catch(() => []);
+  return { title: leagues.find((l) => l.leagueId === Number(id))?.leagueName ?? "League" };
+}
+
+const MEDAL = ["#f5c542", "#c7cad1", "#d99358"];
+
+export default async function LeagueDetailPage(props: PageProps<"/leagues/[id]">) {
+  const { id } = await props.params;
   const leagueId = Number(id);
   if (!Number.isFinite(leagueId)) notFound();
 
@@ -21,65 +45,67 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
   const league = leagues.find((l) => l.leagueId === leagueId);
   if (!league) notFound();
 
-  const ownRow = standings.find((r) => r.entryTeamId === teamId);
-  const inTable = Boolean(ownRow);
+  const rivals = await getLeagueRivals(sb, leagueId, season, teamId, league.leagueName).catch(
+    () => null,
+  );
 
   return (
-    <main className="animate-fade-in mx-auto w-full max-w-4xl flex-1 px-4 py-6">
+    <main className="animate-fade-in mx-auto w-full max-w-3xl px-4 py-6">
       <Link
         href="/leagues"
-        className="mb-3 inline-flex items-center gap-1 text-sm text-[var(--text-secondary)] transition-colors hover:text-white"
+        className="mb-3 inline-flex items-center gap-1 text-sm text-fg-muted transition-colors hover:text-fg"
       >
-        ← Leagues & Cups
+        <IconArrowLeft className="h-4 w-4" /> Leagues &amp; Cups
       </Link>
       <header className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="text-2xl font-extrabold tracking-tight text-white">{league.leagueName}</h1>
-        <span className="text-sm text-[var(--text-secondary)]">Season {season}</span>
+        <h1 className="text-2xl font-extrabold tracking-tight text-fg">{league.leagueName}</h1>
+        <span className="text-sm text-fg-muted">{season}</span>
       </header>
 
-      <div className="card mb-5 flex flex-wrap items-center justify-between gap-3 px-4 py-3.5">
-        <span className="section-label">Your position</span>
-        <div className="flex items-baseline gap-2">
-          <span className="text-xl font-extrabold text-white">
-            {league.entryRank ? `#${league.entryRank.toLocaleString()}` : "Unranked"}
-          </span>
-          {!inTable && league.entryRank && (
-            <span className="text-xs text-[var(--text-muted)]">(outside the table below)</span>
-          )}
-        </div>
-      </div>
-
       {standings.length === 0 ? (
-        <div className="card px-4 py-8 text-center text-sm text-[var(--text-secondary)]">
-          No standings snapshot yet. They'll show up after the next ingest run.
-        </div>
+        <EmptyState title="No standings snapshot yet">
+          They&apos;ll show up after the next ingest run.
+        </EmptyState>
       ) : (
-        <div className="card overflow-hidden">
-          <div className="grid grid-cols-[auto_1fr_auto] gap-x-3 border-b border-[var(--border-hairline)] px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
-            <span>Rank</span>
-            <span>Team</span>
-            <span className="text-right">Points</span>
-          </div>
-          {standings.map((r, i) => {
-            const isMe = r.entryTeamId === teamId;
-            return (
-              <div
-                key={r.entryTeamId}
-                className={`grid grid-cols-[auto_1fr_auto] items-center gap-x-3 px-4 py-2.5 text-sm transition-colors hover:bg-white/[0.05] ${
-                  isMe ? "bg-[var(--accent-green)]/10" : i % 2 === 1 ? "bg-white/[0.02]" : ""
-                }`}
-                style={isMe ? { boxShadow: "inset 3px 0 0 var(--accent-green)" } : undefined}
-              >
-                <span className="tabular-nums font-extrabold text-white">{r.rank}</span>
-                <span className="truncate">
-                  <span className="font-semibold text-white">{r.entryName}</span>{" "}
-                  <span className="text-[var(--text-muted)]">{r.playerName}</span>
-                </span>
-                <span className="text-right font-extrabold tabular-nums text-white">{r.total}</span>
+        <>
+          {rivals && rivals.podium.length > 0 && (
+            <div className="mb-5 grid grid-cols-3 gap-2.5">
+              {rivals.podium.map((p, i) => (
+                <div key={p.entryTeamId} className="card px-3 py-3 text-center">
+                  <div className="text-lg" style={{ color: MEDAL[i] }}>
+                    ●
+                  </div>
+                  <div className="truncate text-sm font-bold text-fg">{p.entryName}</div>
+                  <div className="truncate text-[11px] text-fg-subtle">{p.playerName}</div>
+                  <div className="mt-1 text-lg font-extrabold tabular-nums text-fg">{p.total}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {rivals?.me && (
+            <div className="card mb-5 flex flex-wrap items-center justify-between gap-3 px-4 py-3.5">
+              <div>
+                <span className="section-label">Your position</span>
+                <div className="text-xl font-extrabold text-fg">#{rivals.me.rank}</div>
               </div>
-            );
-          })}
-        </div>
+              <div className="text-right text-xs text-fg-muted">
+                {rivals.gapToFirst != null && rivals.gapToFirst > 0 && (
+                  <div>{rivals.gapToFirst} pts behind 1st</div>
+                )}
+                {rivals.gapToPodium != null && rivals.gapToPodium > 0 && (
+                  <div>{rivals.gapToPodium} pts off the podium</div>
+                )}
+                {rivals.gapToNextRank != null && rivals.gapToNextRank > 0 && (
+                  <div>{rivals.gapToNextRank} pts to the place above</div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <SectionHeader title="Standings" hint="Tap a column to sort" />
+          <LeagueStandingsTable rows={standings} teamId={teamId} />
+        </>
       )}
     </main>
   );

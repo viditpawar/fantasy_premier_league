@@ -207,3 +207,83 @@ BEGIN
         END LOOP;
     END IF;
 END $$;
+
+-- Read-only aggregate views for the web frontend. Views execute with the
+-- owner's privileges (security_invoker defaults to off), so they read the
+-- underlying tables regardless of RLS; the frontend just needs SELECT on the
+-- view itself. Season-scoped season totals per player, one row per
+-- (season, player_code), including last-5-GW form and current ownership.
+CREATE OR REPLACE VIEW v_player_season AS
+SELECT
+    p.season,
+    p.code                          AS player_code,
+    p.id                            AS player_id,
+    p.web_name,
+    p.element_type,
+    p.now_cost,
+    p.status,
+    p.news,
+    p.chance_of_playing_next_round,
+    t.id                            AS team_id,
+    t.short_name                    AS team_short_name,
+    t.code                          AS team_code,
+    COALESCE(agg.games_played, 0)   AS games_played,
+    COALESCE(agg.total_points, 0)   AS total_points,
+    COALESCE(agg.goals_scored, 0)   AS goals_scored,
+    COALESCE(agg.assists, 0)        AS assists,
+    COALESCE(agg.clean_sheets, 0)   AS clean_sheets,
+    COALESCE(agg.minutes, 0)        AS minutes,
+    COALESCE(agg.bonus, 0)          AS bonus,
+    COALESCE(agg.bps, 0)            AS bps,
+    COALESCE(agg.ict_index, 0)      AS ict_index,
+    CASE WHEN COALESCE(agg.games_played, 0) > 0
+         THEN ROUND(agg.total_points::numeric / agg.games_played, 2)
+         ELSE 0 END                 AS points_per_game,
+    CASE WHEN p.now_cost > 0
+         THEN ROUND(COALESCE(agg.total_points, 0)::numeric / (p.now_cost / 10.0), 2)
+         ELSE 0 END                 AS points_per_million,
+    own.selected                    AS ownership,
+    COALESCE(f5.form_5, 0)          AS form_5,
+    COALESCE(f5.form_series, ARRAY[]::int[]) AS form_series
+FROM players p
+JOIN teams t ON t.season = p.season AND t.id = p.team_id
+LEFT JOIN LATERAL (
+    SELECT
+        COUNT(*) FILTER (WHERE s.minutes > 0) AS games_played,
+        SUM(s.total_points)                   AS total_points,
+        SUM(s.goals_scored)                   AS goals_scored,
+        SUM(s.assists)                        AS assists,
+        SUM(s.clean_sheets)                   AS clean_sheets,
+        SUM(s.minutes)                        AS minutes,
+        SUM(s.bonus)                          AS bonus,
+        SUM(s.bps)                            AS bps,
+        ROUND(AVG(s.ict_index), 1)            AS ict_index
+    FROM player_gameweek_stats s
+    WHERE s.season = p.season AND s.player_code = p.code
+) agg ON TRUE
+LEFT JOIN LATERAL (
+    SELECT
+        SUM(x.total_points)                              AS form_5,
+        array_agg(x.total_points ORDER BY x.gameweek)    AS form_series
+    FROM (
+        SELECT s.total_points, s.gameweek
+        FROM player_gameweek_stats s
+        WHERE s.season = p.season AND s.player_code = p.code
+        ORDER BY s.gameweek DESC
+        LIMIT 5
+    ) x
+) f5 ON TRUE
+LEFT JOIN LATERAL (
+    SELECT s.selected
+    FROM player_gameweek_stats s
+    WHERE s.season = p.season AND s.player_code = p.code
+    ORDER BY s.gameweek DESC
+    LIMIT 1
+) own ON TRUE;
+
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+        EXECUTE 'GRANT SELECT ON v_player_season TO anon';
+    END IF;
+END $$;
