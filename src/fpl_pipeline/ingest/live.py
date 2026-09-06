@@ -373,17 +373,27 @@ def ingest_leagues(conn: psycopg.Connection, season: str, client: FPLClient, tea
             page += 1
 
         conn.cursor().execute("DELETE FROM league_standings WHERE season = %s AND league_id = %s", (season, league_id))
-        rows = [
-            (season, league_id, r["entry"], r["entry_name"], r["player_name"], r["rank"], r["last_rank"], r["total"], r.get("event_total"))
+        # Standings re-rank between page fetches, so the same entry can appear on
+        # two consecutive pages. Keep one row per entry (last one wins).
+        by_entry = {
+            r["entry"]: (season, league_id, r["entry"], r["entry_name"], r["player_name"],
+                         r["rank"], r["last_rank"], r["total"], r.get("event_total"))
             for r in results
-        ]
+        }
         conn.cursor().executemany(
             """
             INSERT INTO league_standings (season, league_id, entry_team_id,
                 entry_name, player_name, rank, last_rank, total, event_total)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (season, league_id, entry_team_id) DO UPDATE SET
+                entry_name = EXCLUDED.entry_name,
+                player_name = EXCLUDED.player_name,
+                rank = EXCLUDED.rank,
+                last_rank = EXCLUDED.last_rank,
+                total = EXCLUDED.total,
+                event_total = EXCLUDED.event_total
             """,
-            rows,
+            list(by_entry.values()),
         )
 
 
