@@ -1,29 +1,31 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getSupabase } from "@/lib/supabase";
 import { getCurrentSeason, getManagerLeagues, getTeamId } from "@/lib/queries";
 import { ManagerLeague } from "@/lib/types";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { SectionHeader } from "@/components/ui/SectionHeader";
+import { Badge } from "@/components/ui/Badge";
 import { IconShield } from "@/components/icons";
+import { fmtInt, rankDelta } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Leagues" };
 
 function RankDelta({ league }: { league: ManagerLeague }) {
   if (league.entryRank == null) {
-    return <span className="text-sm text-[var(--text-muted)]">Unranked</span>;
+    return <span className="text-sm text-fg-subtle">Unranked</span>;
   }
-  if (!league.entryLastRank || league.entryLastRank === 0) {
-    return <span className="text-lg font-extrabold text-white">#{league.entryRank.toLocaleString()}</span>;
-  }
-
-  const delta = league.entryLastRank - league.entryRank;
-  const color = delta > 0 ? "var(--status-good)" : delta < 0 ? "var(--status-critical)" : "var(--text-muted)";
-  const arrow = delta > 0 ? "↑" : delta < 0 ? "↓" : "–";
-
+  const rd = rankDelta(league.entryRank, league.entryLastRank);
   return (
     <div className="flex items-baseline gap-2">
-      <span className="text-lg font-extrabold text-white">#{league.entryRank.toLocaleString()}</span>
-      {delta !== 0 && (
-        <span className="text-xs font-bold" style={{ color }}>
-          {arrow} {Math.abs(delta).toLocaleString()}
+      <span className="text-lg font-extrabold text-fg">#{fmtInt(league.entryRank)}</span>
+      {rd && rd.direction !== "same" && (
+        <span
+          className="text-xs font-bold"
+          style={{ color: rd.direction === "up" ? "var(--good)" : "var(--critical)" }}
+        >
+          {rd.direction === "up" ? "▲" : "▼"} {fmtInt(rd.value)}
         </span>
       )}
     </div>
@@ -31,39 +33,33 @@ function RankDelta({ league }: { league: ManagerLeague }) {
 }
 
 function LeagueRow({ league }: { league: ManagerLeague }) {
-  const content = (
-    <div className="card flex items-center gap-3 px-4 py-3.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--border-hairline-strong)]">
+  const inner = (
+    <div className="card flex items-center gap-3 px-4 py-3.5 transition-all duration-[var(--dur-fast)] hover:-translate-y-0.5 hover:border-border-strong">
       <div
         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
-        style={{ background: "rgba(122, 10, 134, 0.18)", color: "var(--accent-purple-bright)" }}
+        style={{ background: "color-mix(in oklab, var(--brand-purple-bright) 16%, transparent)", color: "var(--brand-purple-bright)" }}
       >
         <IconShield className="h-5 w-5" />
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="truncate font-semibold text-white">{league.leagueName}</span>
-          <span
-            className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white"
-            style={{ background: "linear-gradient(90deg, var(--accent-purple), var(--accent-purple-bright))" }}
-          >
-            {league.leagueType === "classic" ? "Classic" : "H2H"}
-          </span>
+          <span className="truncate font-semibold text-fg">{league.leagueName}</span>
+          <Badge tone="brand">{league.leagueType === "classic" ? "Classic" : "H2H"}</Badge>
         </div>
         {league.leagueType === "h2h" && (
-          <div className="mt-1 text-xs text-[var(--text-muted)]">Standings not shown yet for head-to-head leagues</div>
+          <div className="mt-1 text-xs text-fg-subtle">Standings table not shown for head-to-head</div>
         )}
       </div>
       <RankDelta league={league} />
     </div>
   );
 
-  if (league.leagueType !== "classic") {
-    return content;
-  }
-  return (
+  return league.leagueType === "classic" ? (
     <Link href={`/leagues/${league.leagueId}`} className="block">
-      {content}
+      {inner}
     </Link>
+  ) : (
+    inner
   );
 }
 
@@ -77,21 +73,19 @@ export default async function LeaguesPage() {
   const h2h = leagues.filter((l) => l.leagueType === "h2h");
 
   return (
-    <main className="animate-fade-in mx-auto w-full max-w-4xl flex-1 px-4 py-6">
+    <main className="animate-fade-in mx-auto w-full max-w-3xl px-4 py-6">
       <header className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="text-2xl font-extrabold tracking-tight text-white">Leagues & Cups</h1>
-        <span className="text-sm text-[var(--text-secondary)]">Season {season}</span>
+        <h1 className="text-2xl font-extrabold tracking-tight text-fg">Leagues &amp; Cups</h1>
+        <span className="text-sm text-fg-muted">{season}</span>
       </header>
 
       {leagues.length === 0 ? (
-        <div className="card px-4 py-8 text-center text-sm text-[var(--text-secondary)]">
-          No leagues found yet. They'll show up after the next ingest run.
-        </div>
+        <EmptyState title="No leagues found yet">They&apos;ll show up after the next ingest run.</EmptyState>
       ) : (
         <>
           {classic.length > 0 && (
             <section className="mb-6">
-              <h2 className="mb-2 section-label">Classic leagues</h2>
+              <SectionHeader title="Classic leagues" />
               <div className="flex flex-col gap-2.5">
                 {classic.map((l) => (
                   <LeagueRow key={l.leagueId} league={l} />
@@ -99,10 +93,9 @@ export default async function LeaguesPage() {
               </div>
             </section>
           )}
-
           {h2h.length > 0 && (
             <section>
-              <h2 className="mb-2 section-label">Head-to-head leagues</h2>
+              <SectionHeader title="Head-to-head leagues" />
               <div className="flex flex-col gap-2.5">
                 {h2h.map((l) => (
                   <LeagueRow key={l.leagueId} league={l} />
