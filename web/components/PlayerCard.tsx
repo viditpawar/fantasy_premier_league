@@ -20,7 +20,8 @@ export function PlayerCard({ player, live }: { player: SquadPlayer; live?: numbe
   const fixture = player.upcomingFixtures[0];
   const fixtureText = fixture ? `${fixture.opponent} (${fixture.wasHome ? "H" : "A"})` : "No fixture";
   const isUnavailable = player.status && player.status !== "a";
-  const points = live ?? player.lastGameweekPoints;
+  // FPL shows the captain's doubled score on the pitch; bench players show raw.
+  const points = (live ?? player.lastGameweekPoints) * (player.multiplier || 1);
 
   return (
     <button
