@@ -73,6 +73,15 @@ Two runs over the same data must produce the same picks.
 5. Captain = highest `captain_score` among squad players with `flag` not \
    `a_unavailable_status`/`b_low_chance_of_playing`; vice-captain = \
    second highest. Tie-break by lower next-fixture difficulty.
+6. Bench points never count. A transfer only takes its incoming player's \
+   `squad_position` slot — if the outgoing player had `multiplier` 0 \
+   (bench), the incoming player lands on the bench too, not the starting \
+   XI. Whenever the outgoing player's `multiplier` is 0, say explicitly in \
+   that transfer's reasoning that the manager must also move the incoming \
+   player into the starting XI in place of the weakest starting-XI \
+   player at the same position (name that player and cite their `score`) \
+   — otherwise the transfer's benefit won't score any points this \
+   gameweek.
 
 ## Early-season caution
 
