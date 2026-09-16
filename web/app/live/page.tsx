@@ -11,6 +11,7 @@ import {
 } from "@/lib/queries";
 import { StatTile } from "@/components/ui/StatTile";
 import { SectionHeader } from "@/components/ui/SectionHeader";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { IconBolt } from "@/components/icons";
@@ -35,7 +36,7 @@ export default async function LivePage() {
   if (!live) {
     return (
       <main className="animate-fade-in mx-auto w-full max-w-3xl px-4 py-6">
-        <h1 className="mb-4 text-2xl font-extrabold text-fg">Live gameweek</h1>
+        <PageHeader icon={<IconBolt className="h-5 w-5" />} title="Live gameweek" />
         <EmptyState title="No live gameweek data yet">
           This fills in once the current gameweek&apos;s picks and player scores have been ingested.
         </EmptyState>
@@ -62,13 +63,19 @@ export default async function LivePage() {
 
   return (
     <main className="animate-fade-in mx-auto w-full max-w-3xl px-4 py-6">
-      <header className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <h1 className="flex items-center gap-2 text-2xl font-extrabold tracking-tight text-fg">
-          <IconBolt className="h-6 w-6 text-accent" />
-          GW{live.gameweek} live
-        </h1>
-        <AutoRefresh seconds={60} />
-      </header>
+      <PageHeader
+        icon={
+          <span className="relative flex h-full w-full items-center justify-center">
+            <IconBolt className="h-5 w-5" />
+            {!current?.finished && (
+              <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 animate-pulse rounded-full bg-[var(--critical)] ring-2 ring-surface-1" />
+            )}
+          </span>
+        }
+        title={`GW${live.gameweek} live`}
+        subtitle={current?.finished ? "Gameweek finished — scores final" : "Updates with the pipeline ingest"}
+        action={<AutoRefresh seconds={60} />}
+      />
 
       <div className="mb-6 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
         <StatTile label="Live points" value={live.liveTotal} accent="var(--accent)" />
@@ -101,7 +108,18 @@ export default async function LivePage() {
                 {p.isCaptain && <span className="ml-1 text-accent">(C)</span>}
                 {p.isViceCaptain && <span className="ml-1 text-fg-subtle">(V)</span>}
               </span>
-              <span className="w-16 shrink-0 text-right text-xs text-fg-subtle">
+              <span className="flex w-16 shrink-0 items-center justify-end gap-1.5 text-right text-xs text-fg-subtle">
+                <span
+                  className="h-1.5 w-1.5 shrink-0 rounded-full"
+                  style={{
+                    background:
+                      p.hasFixture && !p.fixtureFinished && p.minutes > 0
+                        ? "var(--good)"
+                        : p.hasFixture && !p.fixtureFinished
+                          ? "var(--warning)"
+                          : "var(--fg-subtle)",
+                  }}
+                />
                 {!p.hasFixture
                   ? "no game"
                   : p.fixtureFinished
@@ -123,6 +141,8 @@ export default async function LivePage() {
         <div className="card divide-y divide-border overflow-hidden">
           {bench.map((p) => (
             <div key={p.playerCode} className="flex items-center gap-3 px-3 py-2 text-sm text-fg-muted">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={SHIRT_URL(p.teamCode)} alt="" className="h-6 w-6 shrink-0 object-contain opacity-70" />
               <span className="w-9 shrink-0 text-xs font-bold text-fg-subtle">{p.position}</span>
               <span className="flex-1 truncate">{p.player}</span>
               <span className="w-12 shrink-0 text-right font-bold tabular-nums">{p.livePoints}</span>

@@ -6,7 +6,11 @@ import type { PlayerSeasonRow, Position } from "@/lib/types";
 import { DataTable, type Column } from "./ui/DataTable";
 import { Sparkline } from "./ui/Sparkline";
 import { SegmentedControl } from "./ui/SegmentedControl";
+import { IconSearch } from "./icons";
 import { money, compactNumber } from "@/lib/format";
+
+const SHIRT_URL = (code: number) =>
+  `https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_${code}-66.png`;
 
 const POSITIONS: (Position | "ALL")[] = ["ALL", "GKP", "DEF", "MID", "FWD"];
 
@@ -51,7 +55,9 @@ export function PlayerExplorer({
       header: "Player",
       sortValue: (p) => p.player,
       render: (p) => (
-        <span className="flex items-center gap-1.5">
+        <span className="flex items-center gap-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={SHIRT_URL(p.teamCode)} alt="" className="h-5 w-5 shrink-0 object-contain" />
           <span
             className="h-1.5 w-1.5 shrink-0 rounded-full"
             style={{ background: STATUS_DOT[p.status] ?? "var(--fg-subtle)" }}
@@ -142,12 +148,15 @@ export function PlayerExplorer({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search players…"
-          className="h-9 min-w-[10rem] flex-1 rounded-lg border border-border bg-surface-1 px-3 text-sm outline-none focus:border-border-strong"
-        />
+        <div className="relative min-w-[10rem] flex-1">
+          <IconSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-subtle" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search players…"
+            className="h-9 w-full rounded-full border border-border bg-surface-1 pl-9 pr-3 text-sm outline-none transition-colors focus:border-accent"
+          />
+        </div>
         <SegmentedControl
           size="sm"
           value={pos}

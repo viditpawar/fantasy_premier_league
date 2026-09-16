@@ -44,6 +44,7 @@ export interface Budget {
 export interface TopScorer {
   player: string;
   team: string;
+  teamCode: number;
   points: number;
   goals: number;
   assists: number;

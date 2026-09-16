@@ -8,6 +8,8 @@ import {
   getTeamId,
 } from "@/lib/queries";
 import { PlayerExplorer } from "@/components/PlayerExplorer";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { IconUsers } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Players" };
@@ -28,10 +30,11 @@ export default async function PlayersPage() {
 
   return (
     <main className="animate-fade-in mx-auto w-full max-w-5xl px-4 py-6">
-      <header className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="text-2xl font-extrabold tracking-tight text-fg">Player explorer</h1>
-        <span className="text-sm text-fg-muted">{season}</span>
-      </header>
+      <PageHeader
+        icon={<IconUsers className="h-5 w-5" />}
+        title="Player explorer"
+        subtitle={`${season} · ${players.length} players`}
+      />
       <PlayerExplorer players={players} teams={teams} />
     </main>
   );

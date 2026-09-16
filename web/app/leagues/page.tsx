@@ -5,8 +5,9 @@ import { getCurrentSeason, getManagerLeagues, getTeamId } from "@/lib/queries";
 import { ManagerLeague } from "@/lib/types";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SectionHeader } from "@/components/ui/SectionHeader";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { Badge } from "@/components/ui/Badge";
-import { IconShield } from "@/components/icons";
+import { IconShield, IconTrophy } from "@/components/icons";
 import { fmtInt, rankDelta } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -34,7 +35,7 @@ function RankDelta({ league }: { league: ManagerLeague }) {
 
 function LeagueRow({ league }: { league: ManagerLeague }) {
   const inner = (
-    <div className="card flex items-center gap-3 px-4 py-3.5 transition-all duration-[var(--dur-fast)] hover:-translate-y-0.5 hover:border-border-strong">
+    <div className="card card-hover flex items-center gap-3 px-4 py-3.5">
       <div
         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
         style={{ background: "color-mix(in oklab, var(--brand-purple-bright) 16%, transparent)", color: "var(--brand-purple-bright)" }}
@@ -74,10 +75,12 @@ export default async function LeaguesPage() {
 
   return (
     <main className="animate-fade-in mx-auto w-full max-w-3xl px-4 py-6">
-      <header className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="text-2xl font-extrabold tracking-tight text-fg">Leagues &amp; Cups</h1>
-        <span className="text-sm text-fg-muted">{season}</span>
-      </header>
+      <PageHeader
+        icon={<IconTrophy className="h-5 w-5" />}
+        title="Leagues & Cups"
+        subtitle={`${season} · ${classic.length + h2h.length} leagues joined`}
+        accent="var(--brand-purple-bright)"
+      />
 
       {leagues.length === 0 ? (
         <EmptyState title="No leagues found yet">They&apos;ll show up after the next ingest run.</EmptyState>

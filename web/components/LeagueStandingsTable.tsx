@@ -4,6 +4,8 @@ import type { LeagueStandingRow } from "@/lib/types";
 import { DataTable, type Column } from "./ui/DataTable";
 import { rankDelta } from "@/lib/format";
 
+const MEDAL: Record<number, string> = { 1: "#f5c542", 2: "#c7cad1", 3: "#d99358" };
+
 export function LeagueStandingsTable({
   rows,
   teamId,
@@ -19,9 +21,19 @@ export function LeagueStandingsTable({
       sortValue: (r) => r.rank,
       render: (r) => {
         const rd = rankDelta(r.rank, r.lastRank);
+        const medal = MEDAL[r.rank];
         return (
           <span className="flex items-center gap-1.5">
-            <span className="font-extrabold tabular-nums text-fg">{r.rank}</span>
+            {medal ? (
+              <span
+                className="flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-extrabold text-white"
+                style={{ background: `linear-gradient(135deg, ${medal}, color-mix(in oklab, ${medal} 60%, black))` }}
+              >
+                {r.rank}
+              </span>
+            ) : (
+              <span className="font-extrabold tabular-nums text-fg">{r.rank}</span>
+            )}
             {rd && rd.direction !== "same" && (
               <span
                 className="text-[10px] font-bold"

@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/Badge";
 import { FDRCell } from "@/components/ui/FDRCell";
 import { AreaTrend } from "@/components/charts/AreaTrend";
 import { IconArrowLeft } from "@/components/icons";
-import { money, compactNumber } from "@/lib/format";
+import { money, compactNumber, positionColor, CREST_URL } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -73,26 +73,46 @@ export default async function PlayerDetailPage(props: PageProps<"/players/[code]
         <IconArrowLeft className="h-4 w-4" /> Player explorer
       </Link>
 
-      <header className="mb-5 flex items-center gap-4">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={PHOTO(meta.playerCode)}
-          alt=""
-          className="h-20 w-16 rounded-lg bg-surface-2 object-cover object-top"
+      <header className="relative mb-5 overflow-hidden rounded-2xl border border-border bg-surface-1 px-4 py-4 shadow-[var(--shadow-card)] sm:px-5">
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.12]"
+          style={{
+            background: `radial-gradient(120% 140% at 0% 0%, ${positionColor(meta.position)}, transparent 60%)`,
+          }}
         />
-        <div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-fg">{meta.player}</h1>
-          <p className="text-sm text-fg-muted">
-            {meta.team} · {meta.position} · {money(meta.nowCost)}
-          </p>
-          <div className="mt-1.5 flex flex-wrap gap-1.5">
-            {meta.inSquad && <Badge tone="accent">In your squad</Badge>}
-            {meta.status !== "a" && (
-              <Badge tone="critical">{STATUS_LABELS[meta.status] ?? "Flagged"}</Badge>
-            )}
-            {meta.ownership != null && (
-              <Badge tone="neutral">TSB {compactNumber(meta.ownership)}</Badge>
-            )}
+        <div className="relative flex items-center gap-4">
+          <div className="relative shrink-0">
+            <div
+              className="absolute -inset-1 rounded-lg opacity-40 blur-md"
+              style={{ background: positionColor(meta.position) }}
+            />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={PHOTO(meta.playerCode)}
+              alt=""
+              className="relative h-20 w-16 rounded-lg bg-surface-2 object-cover object-top"
+            />
+          </div>
+          <div className="min-w-0">
+            <h1 className="truncate text-2xl font-extrabold tracking-tight text-fg">{meta.player}</h1>
+            <p className="flex items-center gap-1.5 text-sm text-fg-muted">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={CREST_URL(meta.teamCode)} alt="" className="h-4 w-4 object-contain" />
+              {meta.team} ·{" "}
+              <span className="font-semibold" style={{ color: positionColor(meta.position) }}>
+                {meta.position}
+              </span>{" "}
+              · {money(meta.nowCost)}
+            </p>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {meta.inSquad && <Badge tone="accent">In your squad</Badge>}
+              {meta.status !== "a" && (
+                <Badge tone="critical">{STATUS_LABELS[meta.status] ?? "Flagged"}</Badge>
+              )}
+              {meta.ownership != null && (
+                <Badge tone="neutral">TSB {compactNumber(meta.ownership)}</Badge>
+              )}
+            </div>
           </div>
         </div>
       </header>
@@ -159,7 +179,10 @@ export default async function PlayerDetailPage(props: PageProps<"/players/[code]
             </thead>
             <tbody>
               {gameLog.map((g) => (
-                <tr key={g.gameweek} className="border-b border-border/60 last:border-0">
+                <tr
+                  key={g.gameweek}
+                  className="border-b border-border/60 transition-colors last:border-0 hover:bg-surface-2/70"
+                >
                   <td className="px-2 py-1.5 text-left font-bold text-fg-subtle">{g.gameweek}</td>
                   <td className="px-2 py-1.5 text-left">
                     {g.opponent} {g.wasHome ? "(H)" : "(A)"}

@@ -11,7 +11,9 @@ import {
 } from "@/lib/queries";
 import { FixtureTicker } from "@/components/FixtureTicker";
 import { SectionHeader } from "@/components/ui/SectionHeader";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { FDRCell } from "@/components/ui/FDRCell";
+import { IconCalendar } from "@/components/icons";
 import { CREST_URL } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -50,10 +52,12 @@ export default async function FixturesPage(props: PageProps<"/fixtures">) {
 
   return (
     <main className="animate-fade-in mx-auto w-full max-w-5xl px-4 py-6">
-      <header className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="text-2xl font-extrabold tracking-tight text-fg">Fixture ticker</h1>
-        <span className="text-sm text-fg-muted">from GW{fromGw}</span>
-      </header>
+      <PageHeader
+        icon={<IconCalendar className="h-5 w-5" />}
+        title="Fixture ticker"
+        subtitle={`Difficulty from GW${fromGw} onward`}
+        accent="var(--cyan)"
+      />
 
       {teamDetail?.team && (
         <section className="mb-6">

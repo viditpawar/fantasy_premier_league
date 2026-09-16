@@ -15,8 +15,18 @@ function Pitch({ starting, bench, liveByCode }: ViewProps) {
     starting.filter((p) => p.position === pos).sort((a, b) => a.squadPosition - b.squadPosition),
   ).filter((r) => r.length > 0);
 
+  const formation = rows
+    .filter((r) => r[0]?.position !== "GKP")
+    .map((r) => r.length)
+    .join("-");
+
   return (
     <>
+      <div className="mb-2 flex justify-center">
+        <span className="rounded-full border border-border bg-surface-1 px-3 py-1 text-xs font-bold tracking-wide text-fg-muted">
+          Formation {formation}
+        </span>
+      </div>
       <div
         className="grain relative overflow-hidden rounded-2xl px-3 pb-6 pt-8 shadow-[var(--shadow-pop)]"
         style={{

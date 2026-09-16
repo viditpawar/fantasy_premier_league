@@ -11,8 +11,9 @@ import {
   getTeamId,
 } from "@/lib/queries";
 import { StatTile } from "@/components/ui/StatTile";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { SquadView } from "@/components/SquadView";
-import { IconBolt, IconPiggyBank, IconTrendingUp, IconTrophy, IconWallet } from "@/components/icons";
+import { IconBolt, IconPiggyBank, IconPitch, IconTrendingUp, IconTrophy, IconWallet } from "@/components/icons";
 import { rankDelta } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -46,25 +47,28 @@ export default async function SquadPage() {
 
   return (
     <main className="animate-fade-in mx-auto w-full max-w-4xl px-4 py-6">
-      <header className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="text-2xl font-extrabold tracking-tight text-fg">My Squad</h1>
-        <span className="text-sm text-fg-muted">
-          {season} · after GW{gameweek}
-        </span>
-      </header>
+      <PageHeader
+        icon={<IconPitch className="h-5 w-5" />}
+        title="My Squad"
+        subtitle={`${season} · after GW${gameweek}`}
+      />
 
       {gwLive && live && (
         <Link
           href="/live"
-          className="mb-4 flex items-center gap-3 rounded-xl border border-accent/40 bg-[color-mix(in_oklab,var(--accent)_10%,transparent)] px-4 py-3 transition-colors hover:border-accent"
+          className="card-hover mb-4 flex items-center gap-3 rounded-xl border border-accent/40 bg-[color-mix(in_oklab,var(--accent)_10%,transparent)] px-4 py-3 transition-colors hover:border-accent"
         >
-          <IconBolt className="h-5 w-5 text-accent" />
+          <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[color-mix(in_oklab,var(--accent)_18%,transparent)]">
+            <IconBolt className="h-5 w-5 text-accent" />
+            <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 animate-pulse rounded-full bg-[var(--critical)] ring-2 ring-surface-0" />
+          </span>
           <div className="flex-1">
             <div className="font-bold text-fg">
               GW{live.gameweek} live · {live.liveTotal} pts
             </div>
             <div className="text-xs text-fg-muted">
-              {live.playersYetToPlay} yet to play · captain {live.captain ?? "—"}
+              {live.playersPlaying} playing · {live.playersYetToPlay} yet to play · captain{" "}
+              {live.captain ?? "—"}
             </div>
           </div>
           <span className="text-sm font-semibold text-accent">Open →</span>
