@@ -40,8 +40,11 @@ estimate one yourself:
   0) costs nothing directly, so a bench player's poor form/zero minutes \
   is never flagged. These are already priority-ordered a > b > c > d.
 - `score`: last-5-gameweek form (most recent gameweek weighted double) \
-  minus (average next-3-fixture difficulty × 3). Higher is better. This \
-  is already computed from real data — trust it exactly as given.
+  minus (upcoming-fixture difficulty × 3, averaged over the next 3 \
+  fixtures with the immediate next one weighted double — the very next \
+  gameweek's difficulty matters more for a transfer made now than a \
+  fixture two or three gameweeks out). Higher is better. This is already \
+  computed from real data — trust it exactly as given.
 - `captain_score` (squad players only): same form weighting, minus \
   (next-1-fixture difficulty × 2). Used only for the captain/vice pick.
 
