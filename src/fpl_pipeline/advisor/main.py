@@ -73,7 +73,12 @@ Two runs over the same data must produce the same picks.
 5. Captain = highest `captain_score` among squad players with `flag` not \
    `a_unavailable_status`/`b_low_chance_of_playing`; vice-captain = \
    second highest. Tie-break by lower next-fixture difficulty.
-6. Bench points never count. A transfer only takes its incoming player's \
+6. Max 3 players per real-world club (FPL rule). Before recommending any \
+   transfer, count how many squad players — excluding the outgoing player — \
+   already belong to the incoming candidate's `team`. If that count is \
+   already 3, the candidate is illegal; skip it and move to the next-best \
+   candidate by `score` for that position.
+7. Bench points never count. A transfer only takes its incoming player's \
    `squad_position` slot — if the outgoing player had `multiplier` 0 \
    (bench), the incoming player lands on the bench too, not the starting \
    XI. Whenever the outgoing player's `multiplier` is 0, say explicitly in \
