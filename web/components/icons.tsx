@@ -135,6 +135,14 @@ export function IconClock({ className }: IconProps) {
   );
 }
 
+export function IconStar({ className }: IconProps) {
+  return (
+    <svg {...base} fill="currentColor" stroke="none" className={className}>
+      <path d="M12 2.5l2.9 6.1 6.6.7-4.9 4.5 1.3 6.6-5.9-3.4-5.9 3.4 1.3-6.6-4.9-4.5 6.6-.7L12 2.5Z" />
+    </svg>
+  );
+}
+
 export function IconArrowLeft({ className }: IconProps) {
   return (
     <svg {...base} className={className}>

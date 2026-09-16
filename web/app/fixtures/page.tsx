@@ -12,6 +12,7 @@ import {
 import { FixtureTicker } from "@/components/FixtureTicker";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { FDRCell } from "@/components/ui/FDRCell";
+import { CREST_URL } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Fixtures" };
@@ -57,7 +58,13 @@ export default async function FixturesPage(props: PageProps<"/fixtures">) {
       {teamDetail?.team && (
         <section className="mb-6">
           <SectionHeader
-            title={`${teamDetail.team.shortName} — next fixtures`}
+            title={
+              <span className="inline-flex items-center gap-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={CREST_URL(teamDetail.team.code)} alt="" className="h-5 w-5 object-contain" />
+                {teamDetail.team.shortName} — next fixtures
+              </span>
+            }
             action={
               <Link href="/fixtures" className="text-xs font-semibold text-accent">
                 Clear

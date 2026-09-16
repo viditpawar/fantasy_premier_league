@@ -37,7 +37,7 @@ export function StatTile({
   hint,
 }: StatTileProps) {
   return (
-    <div className="card relative min-w-0 overflow-hidden px-4 py-3.5">
+    <div className="card card-hover relative min-w-0 overflow-hidden px-4 py-3.5">
       <div
         className="absolute inset-x-0 top-0 h-[2px]"
         style={{ background: `linear-gradient(90deg, ${accent}, transparent)` }}
