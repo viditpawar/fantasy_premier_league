@@ -74,7 +74,7 @@ export function TransferCompare({
 
   return (
     <div
-      className="card px-4 py-3.5"
+      className="card card-hover px-4 py-3.5"
       style={rank === 1 ? { boxShadow: "inset 3px 0 0 var(--accent), var(--shadow-card)" } : undefined}
     >
       <div className="mb-2 flex flex-wrap items-center gap-2">

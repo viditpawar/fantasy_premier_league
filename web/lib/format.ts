@@ -41,6 +41,10 @@ export function rankDelta(
   return { value: Math.abs(value), direction: value > 0 ? "up" : value < 0 ? "down" : "same" };
 }
 
+/** Official FPL club crest CDN, keyed by team `code` (not id). */
+export const CREST_URL = (code: number) =>
+  `https://resources.premierleague.com/premierleague/badges/70/t${code}.png`;
+
 export function fdrColor(difficulty: number | null | undefined): string {
   switch (difficulty) {
     case 1:
