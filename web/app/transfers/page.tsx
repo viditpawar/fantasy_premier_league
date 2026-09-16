@@ -6,7 +6,22 @@ import { SectionHeader } from "@/components/ui/SectionHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Badge } from "@/components/ui/Badge";
 import { TransferCompare } from "@/components/TransferCompare";
+import { FDRCell } from "@/components/ui/FDRCell";
 import { IconSwap, IconTrendingUp } from "@/components/icons";
+import type { PlayerSeasonRow } from "@/lib/types";
+
+function CaptainFixtures({
+  byName,
+  name,
+}: {
+  byName: Map<string, PlayerSeasonRow>;
+  name: string;
+}) {
+  const player = byName.get(name.toLowerCase());
+  const fixture = player?.upcomingFixtures?.[0];
+  if (!fixture) return null;
+  return <FDRCell opponent={fixture.opponent} wasHome={fixture.wasHome} difficulty={fixture.difficulty} size="sm" />;
+}
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Transfers" };
@@ -17,7 +32,7 @@ export default async function TransfersPage() {
   const teamId = await getTeamId(sb);
   const [suggestion, players] = await Promise.all([
     getAdvisorSuggestion(sb, teamId, season),
-    getPlayers(sb, season),
+    getPlayers(sb, season, new Set(), { withFixtures: true }),
   ]);
 
   const byName = new Map(players.map((p) => [p.player.toLowerCase(), p]));
@@ -102,12 +117,14 @@ export default async function TransfersPage() {
                     C
                   </span>
                   <span className="font-semibold text-fg">{suggestion.captain}</span>
+                  <CaptainFixtures byName={byName} name={suggestion.captain} />
                 </span>
                 <span className="inline-flex items-center gap-1.5">
                   <span className="flex h-5 w-5 items-center justify-center rounded-full bg-surface-3 text-[11px] font-extrabold text-fg">
                     V
                   </span>
                   <span className="text-fg-muted">{suggestion.viceCaptain}</span>
+                  <CaptainFixtures byName={byName} name={suggestion.viceCaptain} />
                 </span>
               </div>
               <p className="text-sm text-fg-muted">{suggestion.captaincyReasoning}</p>

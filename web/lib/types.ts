@@ -136,6 +136,7 @@ export interface PlayerSeasonRow {
   form5: number;
   formSeries: number[];
   inSquad: boolean;
+  upcomingFixtures?: UpcomingFixture[];
 }
 
 export interface PlayerGameLogRow {

@@ -1,6 +1,19 @@
 import type { PlayerSeasonRow, SuggestedTransfer } from "@/lib/types";
 import { Badge } from "./ui/Badge";
+import { FDRCell } from "./ui/FDRCell";
 import { money } from "@/lib/format";
+
+function FixtureRow({ player, align }: { player: PlayerSeasonRow; align: "start" | "end" }) {
+  const fixtures = player.upcomingFixtures ?? [];
+  if (fixtures.length === 0) return null;
+  return (
+    <div className={`flex flex-wrap gap-1 ${align === "end" ? "justify-end" : "justify-start"}`}>
+      {fixtures.map((f, i) => (
+        <FDRCell key={i} opponent={f.opponent} wasHome={f.wasHome} difficulty={f.difficulty} size="sm" />
+      ))}
+    </div>
+  );
+}
 
 function Bar({
   label,
@@ -107,6 +120,11 @@ export function TransferCompare({
             inVal={inc.pointsPerMillion}
             fmt={(n) => n.toFixed(1)}
           />
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 pt-1 text-xs">
+            <FixtureRow player={out} align="end" />
+            <span className="section-label whitespace-nowrap">Fixtures</span>
+            <FixtureRow player={inc} align="start" />
+          </div>
         </div>
       )}
 

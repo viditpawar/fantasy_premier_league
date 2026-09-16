@@ -191,14 +191,23 @@ def compute_form_score(recent_form: list[dict]) -> float:
 
 
 def avg_upcoming_difficulty(fixtures: list[dict], n: int = 3) -> float | None:
+    """Weighted average difficulty over the next N fixtures, the immediate
+    next fixture weighted double — a transfer is made for the very next
+    gameweek, so that match's difficulty should matter more than a fixture
+    two or three gameweeks out, not count equally.
+    """
     diffs = [f["difficulty"] for f in fixtures[:n]]
-    return sum(diffs) / len(diffs) if diffs else None
+    if not diffs:
+        return None
+    weights = [2] + [1] * (len(diffs) - 1)
+    return sum(w * d for w, d in zip(weights, diffs)) / sum(weights)
 
 
 def compute_score(recent_form: list[dict], fixtures: list[dict]) -> float:
     """Step-2 rubric score: form (last 5 GW, most recent doubled) minus
-    average next-3-fixture difficulty x3. Computed here, not by the LLM, so
-    the advisor never has to invent numbers it wasn't given.
+    upcoming-fixture difficulty x3 (next 3 fixtures, immediate one weighted
+    double). Computed here, not by the LLM, so the advisor never has to
+    invent numbers it wasn't given.
     """
     form = compute_form_score(recent_form)
     avg_diff = avg_upcoming_difficulty(fixtures, n=3)

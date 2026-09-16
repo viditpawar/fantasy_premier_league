@@ -480,6 +480,7 @@ export async function getPlayers(
   sb: SupabaseClient,
   season: string,
   squadCodes: Set<number> = new Set(),
+  opts: { withFixtures?: boolean } = {},
 ): Promise<PlayerSeasonRow[]> {
   const { data, error } = await sb
     .from("v_player_season")
@@ -487,7 +488,22 @@ export async function getPlayers(
     .eq("season", season)
     .order("total_points", { ascending: false });
   if (error) throw error;
-  return (data ?? []).map((r) => mapPlayerSeason(r as Record<string, unknown>, squadCodes));
+  const rows = (data ?? []).map((r) => mapPlayerSeason(r as Record<string, unknown>, squadCodes));
+
+  if (opts.withFixtures) {
+    const teamIds = [...new Set(rows.map((r) => r.teamId))];
+    const fixturesByTeam = new Map<number, UpcomingFixture[]>();
+    await Promise.all(
+      teamIds.map(async (tid) => {
+        fixturesByTeam.set(tid, await getUpcomingFixturesForTeam(sb, season, tid));
+      }),
+    );
+    for (const row of rows) {
+      row.upcomingFixtures = fixturesByTeam.get(row.teamId) ?? [];
+    }
+  }
+
+  return rows;
 }
 
 export async function getPlayerDetail(
