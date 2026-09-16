@@ -4,6 +4,9 @@ import { useRouter } from "next/navigation";
 import type { TopScorer } from "@/lib/types";
 import { DataTable, type Column } from "./ui/DataTable";
 
+const SHIRT_URL = (code: number) =>
+  `https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_${code}-66.png`;
+
 export function TopScorersTable({
   rows,
   squadCodes,
@@ -25,7 +28,9 @@ export function TopScorersTable({
       header: "Player",
       sortValue: (r) => r.player,
       render: (r) => (
-        <span className="flex items-center gap-1.5">
+        <span className="flex items-center gap-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={SHIRT_URL(r.teamCode)} alt="" className="h-5 w-5 shrink-0 object-contain" />
           <span className="font-semibold text-fg">{r.player}</span>
           <span className="text-xs text-fg-subtle">{r.team}</span>
           {owned.has(r.playerCode) && (

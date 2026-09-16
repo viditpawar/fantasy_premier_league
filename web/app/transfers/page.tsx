@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Badge } from "@/components/ui/Badge";
 import { TransferCompare } from "@/components/TransferCompare";
 import { FDRCell } from "@/components/ui/FDRCell";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { IconSwap, IconTrendingUp } from "@/components/icons";
 import type { PlayerSeasonRow } from "@/lib/types";
 
@@ -39,12 +40,12 @@ export default async function TransfersPage() {
 
   return (
     <main className="animate-fade-in mx-auto w-full max-w-3xl px-4 py-6">
-      <header className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="text-2xl font-extrabold tracking-tight text-fg">Transfer advisor</h1>
-        {suggestion && (
-          <span className="text-sm text-fg-muted">for GW{suggestion.forGameweek}</span>
-        )}
-      </header>
+      <PageHeader
+        icon={<IconSwap className="h-5 w-5" />}
+        title="Transfer advisor"
+        subtitle={suggestion ? `AI-generated ideas for GW${suggestion.forGameweek}` : undefined}
+        accent="var(--brand-purple-bright)"
+      />
 
       {!suggestion ? (
         <EmptyState title="No suggestion generated yet">

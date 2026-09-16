@@ -10,10 +10,12 @@ import {
 } from "@/lib/queries";
 import { StatTile } from "@/components/ui/StatTile";
 import { SectionHeader } from "@/components/ui/SectionHeader";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { RankChart } from "@/components/charts/RankChart";
 import { PointsVsAverageChart } from "@/components/charts/PointsVsAverageChart";
 import { AreaTrend } from "@/components/charts/AreaTrend";
 import { TopScorersTable } from "@/components/TopScorersTable";
+import { IconChart } from "@/components/icons";
 import { rankDelta } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -36,12 +38,12 @@ export default async function AnalyticsPage() {
 
   return (
     <main className="animate-fade-in mx-auto w-full max-w-4xl px-4 py-6">
-      <header className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="text-2xl font-extrabold tracking-tight text-fg">Analytics</h1>
-        <span className="text-sm text-fg-muted">
-          {season} · {analytics.rows.length} gameweeks
-        </span>
-      </header>
+      <PageHeader
+        icon={<IconChart className="h-5 w-5" />}
+        title="Analytics"
+        subtitle={`${season} · ${analytics.rows.length} gameweeks tracked`}
+        accent="var(--cyan)"
+      />
 
       <div className="mb-6 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
         <StatTile

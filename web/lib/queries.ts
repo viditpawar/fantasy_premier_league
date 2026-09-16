@@ -196,7 +196,7 @@ export async function getTopScorers(
 ): Promise<TopScorer[]> {
   const { data, error } = await sb
     .from("v_player_season")
-    .select("web_name, team_short_name, total_points, goals_scored, assists, player_code")
+    .select("web_name, team_short_name, team_code, total_points, goals_scored, assists, player_code")
     .eq("season", season)
     .order("total_points", { ascending: false })
     .limit(limit);
@@ -204,6 +204,7 @@ export async function getTopScorers(
   return (data ?? []).map((p) => ({
     player: p.web_name,
     team: p.team_short_name ?? "?",
+    teamCode: p.team_code ?? 0,
     points: p.total_points,
     goals: p.goals_scored,
     assists: p.assists,
