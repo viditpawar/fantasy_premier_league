@@ -74,8 +74,8 @@ def get_squad(conn: psycopg.Connection, team_id: int, season: str, gameweek: int
             """
             select p.web_name as player, p.element_type, t.short_name as team,
                 t.code as team_code, p.team_id, p.code as player_code, p.now_cost,
-                p.status, p.news, p.chance_of_playing_next_round, mp.squad_position,
-                mp.multiplier, mp.is_captain, mp.is_vice_captain
+                mp.selling_price, p.status, p.news, p.chance_of_playing_next_round,
+                mp.squad_position, mp.multiplier, mp.is_captain, mp.is_vice_captain
             from manager_picks mp
             join players p on p.season = mp.season and p.id = mp.player_id
             join teams t on t.season = mp.season and t.id = p.team_id
@@ -87,7 +87,11 @@ def get_squad(conn: psycopg.Connection, team_id: int, season: str, gameweek: int
         squad = cur.fetchall()
     for player in squad:
         player["position"] = POSITION_NAMES[player["element_type"]]
-        player["price"] = player["now_cost"] / 10
+        # `selling_price` (real post-profit-sharing sell value) is only
+        # populated when FPL_EMAIL/FPL_PASSWORD are configured — fall back
+        # to now_cost (current market price) as an approximation otherwise.
+        # `price` is what the advisor's budget math actually uses.
+        player["price"] = (player["selling_price"] or player["now_cost"]) / 10
     return squad
 
 
@@ -112,6 +116,24 @@ def get_recent_form(
         if len(form[code]) < last_n:
             form[code].append(row)
     return form
+
+
+def get_season_yellow_cards(
+    conn: psycopg.Connection, season: str, player_codes: list[int]
+) -> dict[int, int]:
+    """Accumulated yellow cards this season, per player — used to flag
+    suspension risk (FPL bans at 5 yellows, then again every 5 after that
+    until the 2nd threshold at 10, which is a 2-match ban)."""
+    rows = conn.execute(
+        """
+        select player_code, sum(yellow_cards) as total
+        from player_gameweek_stats
+        where season = %s and player_code = any(%s)
+        group by player_code
+        """,
+        (season, player_codes),
+    ).fetchall()
+    return {code: total or 0 for code, total in rows}
 
 
 def get_upcoming_fixtures(
@@ -249,12 +271,14 @@ def build_context(conn: psycopg.Connection) -> dict:
     fixtures = get_upcoming_fixtures(conn, season, all_team_ids)
     budget = get_budget(conn, team_id, season, gameweek)
     free_transfers = get_free_transfers(conn, team_id, season, gameweek)
+    yellow_cards = get_season_yellow_cards(conn, season, player_codes)
 
     for player in squad:
         player["recent_form"] = form.get(player["player_code"], [])
         player["upcoming_fixtures"] = fixtures.get(player["team_id"], [])
         player["score"] = compute_score(player["recent_form"], player["upcoming_fixtures"])
         player["captain_score"] = compute_captain_score(player["recent_form"], player["upcoming_fixtures"])
+        player["season_yellow_cards"] = yellow_cards.get(player["player_code"], 0)
 
     for candidate in all_candidates:
         candidate["recent_form"] = form.get(candidate["player_code"], [])
@@ -285,6 +309,10 @@ def _flag_replacement_candidates(squad: list[dict], candidates: dict[str, list[d
             player["flag"] = "a_unavailable_status"
         elif player["chance_of_playing_next_round"] is not None and player["chance_of_playing_next_round"] < 75:
             player["flag"] = "b_low_chance_of_playing"
+        elif player["season_yellow_cards"] in (4, 9):
+            # FPL bans at 5 accumulated yellows (1 match), then again at 10
+            # (2 matches) — 4 or 9 means the very next booking triggers it.
+            player["flag"] = "b2_suspension_risk"
         elif starting and player["recent_form"] and player["recent_form"][0]["minutes"] == 0:
             # 0 minutes only matters as a rotation-risk signal for players
             # who were actually selected to start — a bench player sitting

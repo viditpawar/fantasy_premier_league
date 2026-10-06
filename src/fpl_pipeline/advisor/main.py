@@ -33,12 +33,16 @@ estimate one yourself:
 - `flag`: null if the player is fine, otherwise one of
   `a_unavailable_status` (status isn't 'a' — injured/suspended/unavailable), \
   `b_low_chance_of_playing` (chance_of_playing_next_round < 75), \
-  `c_zero_minutes_last_gw` (rotation risk), or \
+  `b2_suspension_risk` (`season_yellow_cards` is 4 or 9 — FPL bans at 5 \
+  accumulated yellows for 1 match, then again at 10 for 2 matches, so the \
+  very next booking triggers a ban even though the player is fully \
+  available right now), `c_zero_minutes_last_gw` (rotation risk), or \
   `d_low_form_vs_best_candidate` (weakest scorer at their position, well \
   behind the best available replacement). `c` and `d` are only ever set \
   on starting-XI players (`multiplier` > 0) — a benched player (multiplier \
   0) costs nothing directly, so a bench player's poor form/zero minutes \
-  is never flagged. These are already priority-ordered a > b > c > d.
+  is never flagged; `a`/`b`/`b2` apply regardless of bench status. These \
+  are already priority-ordered a > b > b2 > c > d.
 - `score`: last-5-gameweek form (most recent gameweek weighted double) \
   minus (upcoming-fixture difficulty × 3, averaged over the next 3 \
   fixtures with the immediate next one weighted double — the very next \
@@ -51,15 +55,19 @@ estimate one yourself:
 The manager has a limited number of free transfers (given as \
 `free_transfers`). Each transfer beyond that number costs 4 points off \
 their total score for the gameweek. A transfer must also fit the budget: \
-the incoming player's price must be no more than the outgoing player's \
-price plus bank.
+the incoming player's `price` must be no more than the outgoing squad \
+player's `price` plus bank. A squad player's `price` is already their \
+real sell value where known (FPL's profit-sharing rule means selling a \
+player who's risen in price doesn't always recover the full current \
+market price) — trust it as given, don't substitute a candidate's own \
+listed price for what a squad player would sell for.
 
 ## Selection method — mechanical, not a creative task
 
 Two runs over the same data must produce the same picks.
 
 1. Only consider squad players with a non-null `flag`, highest priority \
-   first (a, then b, then c, then d). Within the same flag letter, order \
+   first (a, then b, then b2, then c, then d). Within the same flag, order \
    by `score` ascending (worst first — the bigger problem is more urgent). \
    If none are flagged, recommend no transfer.
 2. For the highest-priority flagged player, look at `transfer_candidates` \
@@ -73,9 +81,19 @@ Two runs over the same data must produce the same picks.
    gameweeks would clear the 4-point cost several times over, not just \
    barely). This is intentionally a high bar — leave it empty in the \
    common case that no swap clears it.
-5. Captain = highest `captain_score` among squad players with `flag` not \
-   `a_unavailable_status`/`b_low_chance_of_playing`; vice-captain = \
-   second highest. Tie-break by lower next-fixture difficulty.
+5. Captain: `captain_score` rewards good fixture timing but has no idea of a \
+   player's actual scoring ceiling, so a well-fixtured defender or \
+   defensive midfielder can outscore a premium attacker on this number \
+   alone — that's a blind spot in the formula, not a real reflection of \
+   who's most likely to return the most points. So: among squad players \
+   with `flag` not `a_unavailable_status`/`b_low_chance_of_playing`, \
+   restrict the captain and vice-captain pick to MID and FWD players \
+   (GKP/DEF are never nailed-on captain picks regardless of fixture); \
+   within that pool, highest `captain_score` is captain, second-highest \
+   is vice-captain, tie-break by lower next-fixture difficulty. If the \
+   squad has no eligible MID/FWD (shouldn't happen in a valid squad), \
+   fall back to the single highest `captain_score` among all eligible \
+   players and say so explicitly.
 6. Max 3 players per real-world club (FPL rule). Before recommending any \
    transfer, count how many squad players — excluding the outgoing player — \
    already belong to the incoming candidate's `team`. If that count is \
