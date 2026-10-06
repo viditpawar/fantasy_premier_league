@@ -73,9 +73,19 @@ Two runs over the same data must produce the same picks.
    gameweeks would clear the 4-point cost several times over, not just \
    barely). This is intentionally a high bar — leave it empty in the \
    common case that no swap clears it.
-5. Captain = highest `captain_score` among squad players with `flag` not \
-   `a_unavailable_status`/`b_low_chance_of_playing`; vice-captain = \
-   second highest. Tie-break by lower next-fixture difficulty.
+5. Captain: `captain_score` rewards good fixture timing but has no idea of a \
+   player's actual scoring ceiling, so a well-fixtured defender or \
+   defensive midfielder can outscore a premium attacker on this number \
+   alone — that's a blind spot in the formula, not a real reflection of \
+   who's most likely to return the most points. So: among squad players \
+   with `flag` not `a_unavailable_status`/`b_low_chance_of_playing`, \
+   restrict the captain and vice-captain pick to MID and FWD players \
+   (GKP/DEF are never nailed-on captain picks regardless of fixture); \
+   within that pool, highest `captain_score` is captain, second-highest \
+   is vice-captain, tie-break by lower next-fixture difficulty. If the \
+   squad has no eligible MID/FWD (shouldn't happen in a valid squad), \
+   fall back to the single highest `captain_score` among all eligible \
+   players and say so explicitly.
 6. Max 3 players per real-world club (FPL rule). Before recommending any \
    transfer, count how many squad players — excluding the outgoing player — \
    already belong to the incoming candidate's `team`. If that count is \
