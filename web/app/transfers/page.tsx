@@ -1,14 +1,13 @@
 import type { Metadata } from "next";
 import { getSupabase } from "@/lib/supabase";
 import { getAdvisorSuggestion, getCurrentSeason, getPlayers, getTeamId } from "@/lib/queries";
-import { StatTile } from "@/components/ui/StatTile";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Badge } from "@/components/ui/Badge";
 import { TransferCompare } from "@/components/TransferCompare";
 import { FDRCell } from "@/components/ui/FDRCell";
-import { PageHeader } from "@/components/ui/PageHeader";
-import { IconSwap, IconTrendingUp } from "@/components/icons";
+import { Hero } from "@/components/ui/Hero";
+import { IconSwap } from "@/components/icons";
 import type { PlayerSeasonRow } from "@/lib/types";
 
 function CaptainFixtures({
@@ -40,11 +39,20 @@ export default async function TransfersPage() {
 
   return (
     <main className="animate-fade-in mx-auto w-full max-w-3xl px-4 py-6">
-      <PageHeader
-        icon={<IconSwap className="h-5 w-5" />}
+      <Hero
+        icon={<IconSwap className="h-4 w-4" />}
+        eyebrow={suggestion ? `GW${suggestion.forGameweek} suggestion` : "Transfer advisor"}
         title="Transfer advisor"
-        subtitle={suggestion ? `AI-generated ideas for GW${suggestion.forGameweek}` : undefined}
-        accent="var(--brand-purple-bright)"
+        subtitle={suggestion?.summary}
+        stats={
+          suggestion
+            ? [
+                { label: "Free transfers", value: suggestion.freeTransfers, accent: true },
+                { label: "Ranked ideas", value: suggestion.recommendedTransfers.length },
+                { label: "Worth a hit", value: suggestion.hitTransfers.length },
+              ]
+            : undefined
+        }
       />
 
       {!suggestion ? (
@@ -54,23 +62,6 @@ export default async function TransfersPage() {
         </EmptyState>
       ) : (
         <>
-          <div className="mb-5 grid grid-cols-2 gap-2.5">
-            <StatTile
-              label="Free transfers"
-              value={suggestion.freeTransfers}
-              icon={<IconTrendingUp className="h-4 w-4" />}
-            />
-            <StatTile
-              label="Ranked ideas"
-              value={suggestion.recommendedTransfers.length}
-              icon={<IconSwap className="h-4 w-4" />}
-            />
-          </div>
-
-          <p className="card mb-5 px-4 py-3 text-sm leading-relaxed text-fg-muted">
-            {suggestion.summary}
-          </p>
-
           <section className="mb-6">
             <SectionHeader
               title="Free transfer — ranked options"

@@ -8,7 +8,7 @@ import {
   getTeamId,
 } from "@/lib/queries";
 import { PlayerExplorer } from "@/components/PlayerExplorer";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { Hero } from "@/components/ui/Hero";
 import { IconUsers } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
@@ -30,10 +30,15 @@ export default async function PlayersPage() {
 
   return (
     <main className="animate-fade-in mx-auto w-full max-w-5xl px-4 py-6">
-      <PageHeader
-        icon={<IconUsers className="h-5 w-5" />}
+      <Hero
+        icon={<IconUsers className="h-4 w-4" />}
+        eyebrow={season}
         title="Player explorer"
-        subtitle={`${season} · ${players.length} players`}
+        stats={[
+          { label: "Players", value: players.length, accent: true },
+          { label: "Available", value: players.filter((p) => p.status === "a").length },
+          { label: "In your squad", value: players.filter((p) => p.inSquad).length },
+        ]}
       />
       <PlayerExplorer players={players} teams={teams} />
     </main>
