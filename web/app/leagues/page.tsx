@@ -5,7 +5,7 @@ import { getCurrentSeason, getManagerLeagues, getTeamId } from "@/lib/queries";
 import { ManagerLeague } from "@/lib/types";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SectionHeader } from "@/components/ui/SectionHeader";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { Hero } from "@/components/ui/Hero";
 import { Badge } from "@/components/ui/Badge";
 import { IconShield, IconTrophy } from "@/components/icons";
 import { fmtInt, rankDelta } from "@/lib/format";
@@ -75,11 +75,14 @@ export default async function LeaguesPage() {
 
   return (
     <main className="animate-fade-in mx-auto w-full max-w-3xl px-4 py-6">
-      <PageHeader
-        icon={<IconTrophy className="h-5 w-5" />}
+      <Hero
+        icon={<IconTrophy className="h-4 w-4" />}
+        eyebrow={season}
         title="Leagues & Cups"
-        subtitle={`${season} · ${classic.length + h2h.length} leagues joined`}
-        accent="var(--brand-purple-bright)"
+        stats={[
+          { label: "Classic", value: classic.length, accent: true },
+          { label: "Head-to-head", value: h2h.length },
+        ]}
       />
 
       {leagues.length === 0 ? (

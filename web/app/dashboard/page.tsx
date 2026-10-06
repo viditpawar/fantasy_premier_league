@@ -12,7 +12,7 @@ import {
 } from "@/lib/queries";
 import { StatTile } from "@/components/ui/StatTile";
 import { SectionHeader } from "@/components/ui/SectionHeader";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { Hero } from "@/components/ui/Hero";
 import { RankChart } from "@/components/charts/RankChart";
 import { PointsVsAverageChart } from "@/components/charts/PointsVsAverageChart";
 import { AreaTrend } from "@/components/charts/AreaTrend";
@@ -44,32 +44,36 @@ export default async function AnalyticsPage() {
 
   return (
     <main className="animate-fade-in mx-auto w-full max-w-4xl px-4 py-6">
-      <PageHeader
-        icon={<IconChart className="h-5 w-5" />}
+      <Hero
+        icon={<IconChart className="h-4 w-4" />}
+        eyebrow={`${season} · ${analytics.rows.length} gameweeks tracked`}
         title="Analytics"
-        subtitle={`${season} · ${analytics.rows.length} gameweeks tracked`}
-        accent="var(--cyan)"
+        stats={[
+          { label: "Avg pts / GW", value: analytics.averagePoints.toFixed(1), accent: true },
+          {
+            label: "Best GW",
+            value: `${analytics.bestGameweek?.points ?? 0}${
+              analytics.bestGameweek ? ` (GW${analytics.bestGameweek.gameweek})` : ""
+            }`,
+          },
+          {
+            label: "Overall rank",
+            value: analytics.currentRank ? `#${analytics.currentRank.toLocaleString()}` : "—",
+          },
+          ...(rd && rd.direction !== "same"
+            ? [{ label: "Since GW1", value: `${rd.direction === "up" ? "▲" : "▼"} ${rd.value.toLocaleString()}` }]
+            : []),
+        ]}
       />
 
-      <div className="mb-6 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
-        <StatTile
-          label="Avg points / GW"
-          value={analytics.averagePoints}
-          numberStyle="decimal1"
-          spark={pointsSeries}
-        />
-        <StatTile
-          label="Best gameweek"
-          value={analytics.bestGameweek?.points ?? 0}
-          hint={analytics.bestGameweek ? `GW${analytics.bestGameweek.gameweek}` : undefined}
-        />
+      <div className="bento mb-6">
         <StatTile label="Green arrows" value={analytics.greenArrows} accent="var(--good)" />
         <StatTile label="Red arrows" value={analytics.redArrows} accent="var(--critical)" />
         <StatTile
-          label="Points on bench"
+          label="Bench points"
           value={analytics.totalBenchPoints}
           accent="var(--warning)"
-          hint="Left on the bench this season"
+          hint="Left on the bench"
         />
         <StatTile
           label="Hits taken"
@@ -78,24 +82,12 @@ export default async function AnalyticsPage() {
           accent="var(--critical)"
           hint="Points spent on transfers"
         />
-        <StatTile
-          label="Overall rank"
-          value={analytics.currentRank ?? 0}
-          numberStyle="compact"
-          delta={rd ? { value: rd.value, direction: rd.direction, label: "since GW1" } : undefined}
-        />
-      </div>
-
-      <section className="mb-6">
-        <SectionHeader title="Overall rank progression" hint="Lower is better" />
-        <div className="card px-3 py-4">
+        <div className="card card-hover bento-wide px-4 py-3.5">
+          <div className="section-label mb-2">Overall rank progression</div>
           <RankChart data={analytics.rows.map((r) => ({ gameweek: r.gameweek, overallRank: r.overallRank }))} />
         </div>
-      </section>
-
-      <section className="mb-6">
-        <SectionHeader title="Your points vs the global average" />
-        <div className="card px-3 py-4">
+        <div className="card card-hover bento-wide px-4 py-3.5">
+          <div className="section-label mb-2">Points vs global average</div>
           <PointsVsAverageChart
             data={analytics.rows.map((r) => ({
               gameweek: r.gameweek,
@@ -104,12 +96,9 @@ export default async function AnalyticsPage() {
             }))}
           />
         </div>
-      </section>
-
-      {analytics.teamValueSeries.length > 1 && (
-        <section className="mb-6">
-          <SectionHeader title="Squad value" />
-          <div className="card px-3 py-4">
+        {analytics.teamValueSeries.length > 1 && (
+          <div className="card card-hover col-span-2 px-4 py-3.5 sm:col-span-4">
+            <div className="section-label mb-2">Squad value</div>
             <AreaTrend
               data={analytics.teamValueSeries as unknown as Record<string, number>[]}
               dataKey="value"
@@ -118,8 +107,8 @@ export default async function AnalyticsPage() {
               color="var(--cyan)"
             />
           </div>
-        </section>
-      )}
+        )}
+      </div>
 
       {(movers.risers.length > 0 || movers.fallers.length > 0) && (
         <section className="mb-6">

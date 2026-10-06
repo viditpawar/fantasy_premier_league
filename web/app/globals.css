@@ -47,6 +47,9 @@
   --pitch-a: #1f9d55;
   --pitch-b: #0c7a3d;
 
+  --radius-lg: 22px;
+  --shadow-glow: 0 1px 2px rgba(12, 14, 25, 0.06), 0 20px 50px -18px color-mix(in oklab, var(--accent) 35%, black 65%);
+
   color-scheme: light;
 }
 
@@ -88,6 +91,9 @@
     --pitch-a: #159b4e;
     --pitch-b: #0a6d37;
 
+    --radius-lg: 22px;
+    --shadow-glow: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 24px 60px -16px color-mix(in oklab, var(--accent) 45%, black 55%);
+
     color-scheme: dark;
   }
 }
@@ -128,6 +134,9 @@
 
   --pitch-a: #159b4e;
   --pitch-b: #0a6d37;
+
+  --radius-lg: 22px;
+  --shadow-glow: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 24px 60px -16px color-mix(in oklab, var(--accent) 45%, black 55%);
 
   color-scheme: dark;
 }
@@ -201,6 +210,61 @@ body {
   background: color-mix(in oklab, var(--surface-1) 72%, transparent);
   backdrop-filter: blur(12px) saturate(1.4);
   -webkit-backdrop-filter: blur(12px) saturate(1.4);
+}
+
+.text-gradient {
+  background: linear-gradient(120deg, var(--fg) 10%, var(--accent) 60%, var(--cyan) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.mesh-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(90% 140% at 0% 0%, color-mix(in oklab, var(--brand-purple-bright) 55%, transparent) 0%, transparent 60%),
+    radial-gradient(80% 120% at 100% 0%, color-mix(in oklab, var(--accent) 45%, transparent) 0%, transparent 55%),
+    radial-gradient(100% 100% at 50% 100%, color-mix(in oklab, var(--cyan) 30%, transparent) 0%, transparent 60%),
+    var(--surface-1);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-glow);
+}
+
+.mesh-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.5;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.25'/%3E%3C/svg%3E");
+}
+
+.bento {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.625rem;
+}
+
+@media (max-width: 640px) {
+  .bento {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.bento-wide {
+  grid-column: span 2;
+}
+
+.bento-tall {
+  grid-row: span 2;
+}
+
+@media (max-width: 640px) {
+  .bento-wide {
+    grid-column: span 2;
+  }
 }
 
 .section-label {

@@ -9,9 +9,8 @@ import {
   getManagerLeagues,
   getTeamId,
 } from "@/lib/queries";
-import { StatTile } from "@/components/ui/StatTile";
 import { SectionHeader } from "@/components/ui/SectionHeader";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { Hero } from "@/components/ui/Hero";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { IconBolt } from "@/components/icons";
@@ -36,7 +35,7 @@ export default async function LivePage() {
   if (!live) {
     return (
       <main className="animate-fade-in mx-auto w-full max-w-3xl px-4 py-6">
-        <PageHeader icon={<IconBolt className="h-5 w-5" />} title="Live gameweek" />
+        <Hero icon={<IconBolt className="h-4 w-4" />} title="Live gameweek" />
         <EmptyState title="No live gameweek data yet">
           This fills in once the current gameweek&apos;s picks and player scores have been ingested.
         </EmptyState>
@@ -63,37 +62,28 @@ export default async function LivePage() {
 
   return (
     <main className="animate-fade-in mx-auto w-full max-w-3xl px-4 py-6">
-      <PageHeader
+      <Hero
         icon={
           <span className="relative flex h-full w-full items-center justify-center">
-            <IconBolt className="h-5 w-5" />
+            <IconBolt className="h-4 w-4" />
             {!current?.finished && (
-              <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 animate-pulse rounded-full bg-[var(--critical)] ring-2 ring-surface-1" />
+              <span className="absolute -right-0.5 -top-0.5 h-2 w-2 animate-pulse rounded-full bg-[var(--critical)] ring-2 ring-surface-1" />
             )}
           </span>
         }
+        eyebrow={current?.finished ? "Gameweek finished" : "Live · updates with the pipeline ingest"}
         title={`GW${live.gameweek} live`}
-        subtitle={current?.finished ? "Gameweek finished — scores final" : "Updates with the pipeline ingest"}
         action={<AutoRefresh seconds={60} />}
+        stats={[
+          { label: "Live points", value: live.liveTotal, accent: true },
+          { label: "On the bench", value: live.benchPoints },
+          { label: "Yet to play", value: live.playersYetToPlay, accent: false },
+          {
+            label: "vs average",
+            value: vsAvg != null ? `${vsAvg > 0 ? "+" : ""}${vsAvg}` : "—",
+          },
+        ]}
       />
-
-      <div className="mb-6 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-        <StatTile label="Live points" value={live.liveTotal} accent="var(--accent)" />
-        <StatTile
-          label="On the bench"
-          value={live.benchPoints}
-          accent="var(--warning)"
-          hint="Not counting"
-        />
-        <StatTile label="Yet to play" value={live.playersYetToPlay} hint={`${live.playersPlaying} playing now`} />
-        <StatTile
-          label="vs average"
-          value={vsAvg ?? 0}
-          prefix={vsAvg != null && vsAvg > 0 ? "+" : ""}
-          accent={vsAvg != null && vsAvg >= 0 ? "var(--good)" : "var(--critical)"}
-          hint={live.averageEntryScore != null ? `avg ${live.averageEntryScore}` : undefined}
-        />
-      </div>
 
       <section className="mb-6">
         <SectionHeader title="Starting XI" hint={`captain: ${live.captain ?? "—"}`} />

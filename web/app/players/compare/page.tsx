@@ -8,7 +8,7 @@ import {
   getSquadCodes,
   getTeamId,
 } from "@/lib/queries";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { Hero } from "@/components/ui/Hero";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ComparePlayers } from "@/components/ComparePlayers";
 import { IconArrowLeft, IconSwap } from "@/components/icons";
@@ -46,11 +46,11 @@ export default async function ComparePage(props: PageProps<"/players/compare">) 
       >
         <IconArrowLeft className="h-4 w-4" /> Player explorer
       </Link>
-      <PageHeader
-        icon={<IconSwap className="h-5 w-5" />}
+      <Hero
+        icon={<IconSwap className="h-4 w-4" />}
+        eyebrow="Side by side"
         title="Compare players"
-        subtitle={`${details.length} player${details.length === 1 ? "" : "s"} · best value highlighted`}
-        accent="var(--brand-purple-bright)"
+        subtitle={`${details.length} player${details.length === 1 ? "" : "s"} · best value in each row highlighted`}
       />
 
       {details.length < 2 ? (

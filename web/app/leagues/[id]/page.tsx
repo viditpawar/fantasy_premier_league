@@ -11,7 +11,7 @@ import {
 } from "@/lib/queries";
 import { LeagueStandingsTable } from "@/components/LeagueStandingsTable";
 import { SectionHeader } from "@/components/ui/SectionHeader";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { Hero } from "@/components/ui/Hero";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { IconArrowLeft, IconTrophy } from "@/components/icons";
 
@@ -58,11 +58,21 @@ export default async function LeagueDetailPage(props: PageProps<"/leagues/[id]">
       >
         <IconArrowLeft className="h-4 w-4" /> Leagues &amp; Cups
       </Link>
-      <PageHeader
-        icon={<IconTrophy className="h-5 w-5" />}
+      <Hero
+        icon={<IconTrophy className="h-4 w-4" />}
+        eyebrow={`${season} · ${league.leagueType === "classic" ? "Classic league" : "Head-to-head"}`}
         title={league.leagueName}
-        subtitle={`${season} · ${league.leagueType === "classic" ? "Classic league" : "Head-to-head"}`}
-        accent="var(--warning)"
+        stats={
+          rivals?.me
+            ? [
+                { label: "Your rank", value: `#${rivals.me.rank}`, accent: true },
+                { label: "Total points", value: rivals.me.total },
+                ...(rivals.gapToFirst
+                  ? [{ label: "Behind 1st", value: rivals.gapToFirst }]
+                  : []),
+              ]
+            : undefined
+        }
       />
 
       {standings.length === 0 ? (

@@ -10,11 +10,10 @@ import {
   getSquad,
   getTeamId,
 } from "@/lib/queries";
-import { StatTile } from "@/components/ui/StatTile";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { Hero } from "@/components/ui/Hero";
 import { SquadView } from "@/components/SquadView";
-import { IconBolt, IconPiggyBank, IconPitch, IconTrendingUp, IconTrophy, IconWallet } from "@/components/icons";
-import { rankDelta } from "@/lib/format";
+import { IconBolt, IconPitch } from "@/components/icons";
+import { money, rankDelta } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -47,10 +46,27 @@ export default async function SquadPage() {
 
   return (
     <main className="animate-fade-in mx-auto w-full max-w-4xl px-4 py-6">
-      <PageHeader
-        icon={<IconPitch className="h-5 w-5" />}
+      <Hero
+        icon={<IconPitch className="h-4 w-4" />}
+        eyebrow={`${season} · after GW${gameweek}`}
         title="My Squad"
-        subtitle={`${season} · after GW${gameweek}`}
+        stats={[
+          { label: "Total points", value: budget.totalPoints, accent: true },
+          {
+            label: "Overall rank",
+            value: budget.overallRank ? `#${budget.overallRank.toLocaleString()}` : "—",
+          },
+          { label: "Squad value", value: money(budget.teamValue) },
+          { label: "In the bank", value: money(budget.bank) },
+          ...(rd && rd.direction !== "same"
+            ? [
+                {
+                  label: "Since last GW",
+                  value: `${rd.direction === "up" ? "▲" : "▼"} ${rd.value.toLocaleString()}`,
+                },
+              ]
+            : []),
+        ]}
       />
 
       {gwLive && live && (
@@ -74,37 +90,6 @@ export default async function SquadPage() {
           <span className="text-sm font-semibold text-accent">Open →</span>
         </Link>
       )}
-
-      <div className="mb-5 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-        <StatTile
-          label="Total points"
-          value={budget.totalPoints}
-          icon={<IconTrophy className="h-4 w-4" />}
-        />
-        <StatTile
-          label="Overall rank"
-          value={budget.overallRank ?? 0}
-          numberStyle="compact"
-          icon={<IconTrendingUp className="h-4 w-4" />}
-          delta={rd ? { value: rd.value, direction: rd.direction } : undefined}
-        />
-        <StatTile
-          label="Squad value"
-          value={budget.teamValue / 10}
-          numberStyle="decimal1"
-          prefix="£"
-          suffix="m"
-          icon={<IconWallet className="h-4 w-4" />}
-        />
-        <StatTile
-          label="In the bank"
-          value={budget.bank / 10}
-          numberStyle="decimal1"
-          prefix="£"
-          suffix="m"
-          icon={<IconPiggyBank className="h-4 w-4" />}
-        />
-      </div>
 
       <SquadView starting={starting} bench={bench} liveByCode={liveByCode} />
 

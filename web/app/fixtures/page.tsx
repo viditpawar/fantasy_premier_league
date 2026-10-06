@@ -11,7 +11,7 @@ import {
 } from "@/lib/queries";
 import { FixtureTicker } from "@/components/FixtureTicker";
 import { SectionHeader } from "@/components/ui/SectionHeader";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { Hero } from "@/components/ui/Hero";
 import { FDRCell } from "@/components/ui/FDRCell";
 import { IconCalendar } from "@/components/icons";
 import { CREST_URL } from "@/lib/format";
@@ -52,11 +52,11 @@ export default async function FixturesPage(props: PageProps<"/fixtures">) {
 
   return (
     <main className="animate-fade-in mx-auto w-full max-w-5xl px-4 py-6">
-      <PageHeader
-        icon={<IconCalendar className="h-5 w-5" />}
+      <Hero
+        icon={<IconCalendar className="h-4 w-4" />}
+        eyebrow="Difficulty ticker"
         title="Fixture ticker"
-        subtitle={`Difficulty from GW${fromGw} onward`}
-        accent="var(--cyan)"
+        subtitle={`Mapped from GW${fromGw} onward · tap a club to drill in`}
       />
 
       {teamDetail?.team && (
