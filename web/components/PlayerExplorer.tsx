@@ -7,7 +7,7 @@ import { DataTable, type Column } from "./ui/DataTable";
 import { Sparkline } from "./ui/Sparkline";
 import { SegmentedControl } from "./ui/SegmentedControl";
 import { IconSearch } from "./icons";
-import { money, compactNumber } from "@/lib/format";
+import { money } from "@/lib/format";
 
 const SHIRT_URL = (code: number) =>
   `https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_${code}-66.png`;
@@ -36,6 +36,18 @@ export function PlayerExplorer({
   const [teamFilter, setTeamFilter] = useState("ALL");
   const [availableOnly, setAvailableOnly] = useState(false);
   const [ownedOnly, setOwnedOnly] = useState(false);
+  const [selected, setSelected] = useState<number[]>([]);
+
+  const MAX_COMPARE = 4;
+  const toggleSelected = (code: number) => {
+    setSelected((prev) =>
+      prev.includes(code)
+        ? prev.filter((c) => c !== code)
+        : prev.length < MAX_COMPARE
+          ? [...prev, code]
+          : prev,
+    );
+  };
 
   const filtered = useMemo(() => {
     const query = q.trim().toLowerCase();
@@ -50,6 +62,21 @@ export function PlayerExplorer({
   }, [players, q, pos, teamFilter, availableOnly, ownedOnly]);
 
   const columns: Column<PlayerSeasonRow>[] = [
+    {
+      key: "select",
+      header: "",
+      render: (p) => (
+        <input
+          type="checkbox"
+          checked={selected.includes(p.playerCode)}
+          disabled={!selected.includes(p.playerCode) && selected.length >= MAX_COMPARE}
+          onClick={(e) => e.stopPropagation()}
+          onChange={() => toggleSelected(p.playerCode)}
+          className="h-3.5 w-3.5 accent-[var(--accent)]"
+          aria-label={`Select ${p.player} to compare`}
+        />
+      ),
+    },
     {
       key: "player",
       header: "Player",
@@ -139,7 +166,7 @@ export function PlayerExplorer({
       sortValue: (p) => p.ownership ?? -1,
       render: (p) => (
         <span className="tabular-nums text-fg-muted">
-          {p.ownership != null ? compactNumber(p.ownership) : "—"}
+          {p.ownership != null ? `${p.ownership.toFixed(1)}%` : "—"}
         </span>
       ),
     },
@@ -200,6 +227,31 @@ export function PlayerExplorer({
         initialSort={{ key: "pts", dir: "desc" }}
         onRowClick={(p) => router.push(`/players/${p.playerCode}`)}
       />
+
+      {selected.length > 0 && (
+        <div className="fixed inset-x-0 bottom-20 z-30 flex justify-center px-4 md:bottom-6">
+          <div className="glass flex items-center gap-3 rounded-full border border-border-strong px-4 py-2 shadow-[var(--shadow-pop)]">
+            <span className="text-xs font-semibold text-fg-muted">
+              {selected.length} selected{" "}
+              <span className="text-fg-subtle">(up to {MAX_COMPARE})</span>
+            </span>
+            <button
+              onClick={() => setSelected([])}
+              className="text-xs font-semibold text-fg-subtle transition-colors hover:text-fg"
+            >
+              Clear
+            </button>
+            <button
+              disabled={selected.length < 2}
+              onClick={() => router.push(`/players/compare?codes=${selected.join(",")}`)}
+              className="rounded-full px-3.5 py-1.5 text-xs font-bold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+              style={{ background: "linear-gradient(135deg, var(--accent), var(--brand-purple-bright))" }}
+            >
+              Compare →
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

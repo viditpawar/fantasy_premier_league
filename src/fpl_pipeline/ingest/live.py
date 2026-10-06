@@ -164,8 +164,14 @@ def ingest_player_gameweek_stats(
     player_team = {p["id"]: p["team"] for p in bootstrap["elements"]}
     player_code = {p["id"]: p["code"] for p in bootstrap["elements"]}
     fixture_by_id = {f["id"]: f for f in fixtures}
+    element_by_id = {p["id"]: p for p in bootstrap["elements"]}
 
     played_gameweeks = [e["id"] for e in bootstrap["events"] if e["finished"] or e["is_current"]]
+    # `selected_by_percent` / `transfers_in_event` / `transfers_out_event` / `now_cost` are
+    # only exposed as a live snapshot on bootstrap-static elements (not per-gameweek via
+    # event_live), so they're only meaningful for the most recent gameweek — applying them
+    # to older, already-finished gameweeks would misrepresent them as historical values.
+    latest_gameweek = played_gameweeks[-1] if played_gameweeks else None
 
     for gw in played_gameweeks:
         live = client.event_live(gw)
@@ -181,6 +187,8 @@ def ingest_player_gameweek_stats(
             opponent_team_id = None
             if fixture and was_home is not None:
                 opponent_team_id = fixture["team_a"] if was_home else fixture["team_h"]
+
+            element = element_by_id.get(player_id) if gw == latest_gameweek else None
 
             rows.append(
                 (
@@ -210,10 +218,10 @@ def ingest_player_gameweek_stats(
                     stats["threat"],
                     stats["ict_index"],
                     stats["total_points"],
-                    stats.get("value"),
-                    stats.get("selected"),
-                    stats.get("transfers_in"),
-                    stats.get("transfers_out"),
+                    element.get("now_cost") if element else None,
+                    float(element["selected_by_percent"]) if element else None,
+                    element.get("transfers_in_event") if element else None,
+                    element.get("transfers_out_event") if element else None,
                 )
             )
 

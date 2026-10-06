@@ -4,6 +4,7 @@ import { Nav } from "@/components/Nav";
 import { BottomNav } from "@/components/BottomNav";
 import { GameweekStrip } from "@/components/GameweekStrip";
 import { CommandPalette, type CommandItem } from "@/components/ui/CommandPalette";
+import { PageTransition } from "@/components/PageTransition";
 import { getSupabase } from "@/lib/supabase";
 import {
   getCurrentSeason,
@@ -91,7 +92,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       <body className="flex min-h-full flex-col overflow-x-hidden">
         <Nav />
         {strip && <GameweekStrip {...strip} />}
-        <div className="flex-1 overflow-x-clip pb-20 md:pb-0">{children}</div>
+        <div className="flex-1 overflow-x-clip pb-20 md:pb-0">
+          <PageTransition>{children}</PageTransition>
+        </div>
         <BottomNav />
         <CommandPalette items={commandItems} />
       </body>
