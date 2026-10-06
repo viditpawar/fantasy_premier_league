@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/Badge";
 import { FDRCell } from "@/components/ui/FDRCell";
 import { AreaTrend } from "@/components/charts/AreaTrend";
 import { IconArrowLeft } from "@/components/icons";
-import { money, compactNumber, positionColor, CREST_URL } from "@/lib/format";
+import { money, positionColor, CREST_URL } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -110,7 +110,7 @@ export default async function PlayerDetailPage(props: PageProps<"/players/[code]
                 <Badge tone="critical">{STATUS_LABELS[meta.status] ?? "Flagged"}</Badge>
               )}
               {meta.ownership != null && (
-                <Badge tone="neutral">TSB {compactNumber(meta.ownership)}</Badge>
+                <Badge tone="neutral">TSB {meta.ownership.toFixed(1)}%</Badge>
               )}
             </div>
           </div>

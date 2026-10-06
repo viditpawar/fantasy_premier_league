@@ -20,6 +20,7 @@ import {
   Position,
   SquadPlayer,
   TopScorer,
+  TransferMover,
   UpcomingFixture,
 } from "./types";
 
@@ -248,6 +249,86 @@ export async function getAdvisorSuggestion(
     captaincyReasoning: suggestion.captaincy_reasoning,
     summary: suggestion.summary,
   };
+}
+
+export async function getTransferMomentum(
+  sb: SupabaseClient,
+  season: string,
+  limit = 5,
+): Promise<{ risers: TransferMover[]; fallers: TransferMover[] }> {
+  const { data: gwRow } = await sb
+    .from("player_gameweek_stats")
+    .select("gameweek")
+    .eq("season", season)
+    .order("gameweek", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const gameweek = gwRow?.gameweek;
+  if (gameweek == null) return { risers: [], fallers: [] };
+
+  const { data: stats, error } = await sb
+    .from("player_gameweek_stats")
+    .select("player_code, transfers_in, transfers_out")
+    .eq("season", season)
+    .eq("gameweek", gameweek);
+  if (error) throw error;
+
+  const playerCodes = (stats ?? []).map((s) => s.player_code);
+  const { data: players } = await sb
+    .from("players")
+    .select("code, web_name, element_type, now_cost, team_id")
+    .eq("season", season)
+    .in("code", playerCodes.length ? playerCodes : [-1]);
+  const teamIds = [...new Set((players ?? []).map((p) => p.team_id))];
+  const { data: teams } = await sb
+    .from("teams")
+    .select("id, code")
+    .eq("season", season)
+    .in("id", teamIds.length ? teamIds : [-1]);
+  const teamCodeById = new Map((teams ?? []).map((t) => [t.id, t.code as number]));
+  const playerByCode = new Map((players ?? []).map((p) => [p.code, p]));
+
+  const movers: TransferMover[] = (stats ?? [])
+    .map((s) => {
+      const p = playerByCode.get(s.player_code);
+      if (!p) return null;
+      const transfersIn = s.transfers_in ?? 0;
+      const transfersOut = s.transfers_out ?? 0;
+      return {
+        player: p.web_name,
+        playerCode: s.player_code as number,
+        teamCode: teamCodeById.get(p.team_id) ?? 0,
+        position: POSITION_NAMES[p.element_type],
+        price: p.now_cost / 10,
+        net: transfersIn - transfersOut,
+        transfersIn,
+        transfersOut,
+      };
+    })
+    .filter((m): m is TransferMover => m != null);
+
+  const risers = [...movers].sort((a, b) => b.net - a.net).slice(0, limit);
+  const fallers = [...movers].sort((a, b) => a.net - b.net).slice(0, limit);
+  return { risers, fallers };
+}
+
+export async function getDifferentials(
+  sb: SupabaseClient,
+  season: string,
+  squadCodes: Set<number> = new Set(),
+  maxOwnership = 10,
+  limit = 8,
+): Promise<PlayerSeasonRow[]> {
+  const { data, error } = await sb
+    .from("v_player_season")
+    .select(V_PLAYER_COLS)
+    .eq("season", season)
+    .lte("ownership", maxOwnership)
+    .gte("minutes", 90)
+    .order("total_points", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []).map((r) => mapPlayerSeason(r as Record<string, unknown>, squadCodes));
 }
 
 export async function getManagerLeagues(

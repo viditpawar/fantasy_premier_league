@@ -104,11 +104,18 @@ CREATE TABLE IF NOT EXISTS player_gameweek_stats (
     ict_index NUMERIC,
     total_points INT NOT NULL DEFAULT 0,
     value INT,
-    selected INT,
+    selected NUMERIC,
     transfers_in INT,
     transfers_out INT,
     PRIMARY KEY (season, player_code, gameweek)
 );
+
+-- `selected` holds FPL's selected_by_percent (e.g. 42.3), not a raw count —
+-- was originally INT, which truncated/rejected the decimal. v_player_season
+-- (defined further down) depends on this column, so it must be dropped first
+-- and is recreated by this same script's CREATE OR REPLACE VIEW below.
+DROP VIEW IF EXISTS v_player_season;
+ALTER TABLE player_gameweek_stats ALTER COLUMN selected TYPE NUMERIC;
 
 CREATE TABLE IF NOT EXISTS managers (
     team_id INT PRIMARY KEY,

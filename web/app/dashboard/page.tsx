@@ -2,11 +2,13 @@ import type { Metadata } from "next";
 import { getSupabase } from "@/lib/supabase";
 import {
   getCurrentSeason,
+  getDifferentials,
   getManagerAnalytics,
   getSquadCodes,
   getLatestGameweek,
   getTeamId,
   getTopScorers,
+  getTransferMomentum,
 } from "@/lib/queries";
 import { StatTile } from "@/components/ui/StatTile";
 import { SectionHeader } from "@/components/ui/SectionHeader";
@@ -15,6 +17,8 @@ import { RankChart } from "@/components/charts/RankChart";
 import { PointsVsAverageChart } from "@/components/charts/PointsVsAverageChart";
 import { AreaTrend } from "@/components/charts/AreaTrend";
 import { TopScorersTable } from "@/components/TopScorersTable";
+import { MoversWidget } from "@/components/MoversWidget";
+import { DifferentialsGrid } from "@/components/DifferentialsGrid";
 import { IconChart } from "@/components/icons";
 import { rankDelta } from "@/lib/format";
 
@@ -27,10 +31,12 @@ export default async function AnalyticsPage() {
   const teamId = await getTeamId(sb);
   const gameweek = await getLatestGameweek(sb, teamId, season);
 
-  const [analytics, topScorers, squadCodes] = await Promise.all([
+  const [analytics, topScorers, squadCodes, movers, differentials] = await Promise.all([
     getManagerAnalytics(sb, teamId, season),
     getTopScorers(sb, season, 25),
     getSquadCodes(sb, teamId, season, gameweek),
+    getTransferMomentum(sb, season, 5).catch(() => ({ risers: [], fallers: [] })),
+    getDifferentials(sb, season, new Set(), 10, 8).catch(() => []),
   ]);
 
   const rd = rankDelta(analytics.currentRank, analytics.startRank);
@@ -112,6 +118,20 @@ export default async function AnalyticsPage() {
               color="var(--cyan)"
             />
           </div>
+        </section>
+      )}
+
+      {(movers.risers.length > 0 || movers.fallers.length > 0) && (
+        <section className="mb-6">
+          <SectionHeader title="Transfer momentum" hint={`Net transfers this gameweek`} />
+          <MoversWidget risers={movers.risers} fallers={movers.fallers} />
+        </section>
+      )}
+
+      {differentials.length > 0 && (
+        <section className="mb-6">
+          <SectionHeader title="Differentials" hint="Top scorers owned by under 10% of managers" />
+          <DifferentialsGrid players={differentials} />
         </section>
       )}
 

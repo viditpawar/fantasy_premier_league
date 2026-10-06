@@ -77,6 +77,17 @@ export interface AdvisorSuggestion {
   summary: string;
 }
 
+export interface TransferMover {
+  player: string;
+  playerCode: number;
+  teamCode: number;
+  position: Position;
+  price: number;
+  net: number;
+  transfersIn: number;
+  transfersOut: number;
+}
+
 export type LeagueType = "classic" | "h2h";
 
 export interface ManagerLeague {
