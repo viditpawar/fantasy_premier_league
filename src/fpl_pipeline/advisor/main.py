@@ -55,8 +55,12 @@ estimate one yourself:
 The manager has a limited number of free transfers (given as \
 `free_transfers`). Each transfer beyond that number costs 4 points off \
 their total score for the gameweek. A transfer must also fit the budget: \
-the incoming player's price must be no more than the outgoing player's \
-price plus bank.
+the incoming player's `price` must be no more than the outgoing squad \
+player's `price` plus bank. A squad player's `price` is already their \
+real sell value where known (FPL's profit-sharing rule means selling a \
+player who's risen in price doesn't always recover the full current \
+market price) — trust it as given, don't substitute a candidate's own \
+listed price for what a squad player would sell for.
 
 ## Selection method — mechanical, not a creative task
 

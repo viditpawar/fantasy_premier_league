@@ -7,6 +7,8 @@ load_dotenv()
 
 DATABASE_URL = os.environ["DATABASE_URL"]
 FPL_TEAM_ID = os.environ.get("FPL_TEAM_ID") or None
+FPL_EMAIL = os.environ.get("FPL_EMAIL") or None
+FPL_PASSWORD = os.environ.get("FPL_PASSWORD") or None
 
 
 def current_season(today: date | None = None) -> str:

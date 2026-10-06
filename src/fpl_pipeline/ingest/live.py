@@ -2,8 +2,8 @@
 
 import psycopg
 
-from fpl_pipeline.api.fpl_client import FPLClient
-from fpl_pipeline.config import FPL_TEAM_ID, current_season
+from fpl_pipeline.api.fpl_client import FPLAuthError, FPLClient
+from fpl_pipeline.config import FPL_EMAIL, FPL_PASSWORD, FPL_TEAM_ID, current_season
 from fpl_pipeline.db.connection import get_connection
 
 
@@ -348,6 +348,40 @@ def ingest_manager(conn: psycopg.Connection, season: str, client: FPLClient, tea
             pick_rows,
         )
 
+    if client.authenticated and played_gameweeks:
+        ingest_selling_prices(conn, season, client, team_id, played_gameweeks[-1])
+
+
+def ingest_selling_prices(
+    conn: psycopg.Connection, season: str, client: FPLClient, team_id: int, gameweek: int
+) -> None:
+    """Real sell value (post profit-sharing) for the most recent gameweek's
+    squad — only available once logged in. Best-effort: if the endpoint's
+    shape doesn't match what's expected, skip quietly rather than fail the
+    whole ingest over a budget-accuracy nicety.
+    """
+    try:
+        my_team = client.my_team(team_id)
+        rows = [
+            (team_id, season, gameweek, pick["element"], pick.get("selling_price"))
+            for pick in my_team.get("picks", [])
+            if pick.get("selling_price") is not None
+        ]
+    except Exception as exc:  # noqa: BLE001 - best-effort enrichment, never fatal
+        print(f"  [selling_price] skipped: {exc}")
+        return
+
+    if not rows:
+        return
+
+    conn.cursor().executemany(
+        """
+        UPDATE manager_picks SET selling_price = %s
+        WHERE team_id = %s AND season = %s AND gameweek = %s AND player_id = %s
+        """,
+        [(selling_price, team_id, season, gameweek, player_id) for team_id, season, gameweek, player_id, selling_price in rows],
+    )
+
 
 def ingest_leagues(conn: psycopg.Connection, season: str, client: FPLClient, team_id: int, entry: dict) -> None:
     league_rows = [
@@ -408,6 +442,11 @@ def ingest_leagues(conn: psycopg.Connection, season: str, client: FPLClient, tea
 def run_full_ingest() -> None:
     season = current_season()
     client = FPLClient()
+    if FPL_EMAIL and FPL_PASSWORD:
+        try:
+            client.login(FPL_EMAIL, FPL_PASSWORD)
+        except FPLAuthError as exc:
+            print(f"  [auth] FPL login failed, continuing unauthenticated: {exc}")
     bootstrap = client.bootstrap_static()
     fixtures = client.fixtures()
 
