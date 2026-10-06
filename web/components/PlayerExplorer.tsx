@@ -6,13 +6,16 @@ import type { PlayerSeasonRow, Position } from "@/lib/types";
 import { DataTable, type Column } from "./ui/DataTable";
 import { Sparkline } from "./ui/Sparkline";
 import { SegmentedControl } from "./ui/SegmentedControl";
-import { IconSearch } from "./icons";
+import { PlayerTile } from "./PlayerTile";
+import { CompareBar } from "./CompareBar";
+import { IconGrid, IconList, IconSearch } from "./icons";
 import { money } from "@/lib/format";
 
 const SHIRT_URL = (code: number) =>
   `https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_${code}-66.png`;
 
 const POSITIONS: (Position | "ALL")[] = ["ALL", "GKP", "DEF", "MID", "FWD"];
+const MAX_COMPARE = 4;
 
 const STATUS_DOT: Record<string, string> = {
   a: "var(--good)",
@@ -22,6 +25,33 @@ const STATUS_DOT: Record<string, string> = {
   u: "var(--fg-subtle)",
   n: "var(--fg-subtle)",
 };
+
+function Toggle({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+        checked
+          ? "border-accent/50 bg-[color-mix(in_oklab,var(--accent)_14%,transparent)] text-accent"
+          : "border-border text-fg-muted hover:border-border-strong"
+      }`}
+    >
+      <span
+        className={`h-1.5 w-1.5 rounded-full transition-colors ${checked ? "bg-accent" : "bg-fg-subtle"}`}
+      />
+      {label}
+    </button>
+  );
+}
 
 export function PlayerExplorer({
   players,
@@ -37,8 +67,8 @@ export function PlayerExplorer({
   const [availableOnly, setAvailableOnly] = useState(false);
   const [ownedOnly, setOwnedOnly] = useState(false);
   const [selected, setSelected] = useState<number[]>([]);
+  const [view, setView] = useState<"table" | "cards">("cards");
 
-  const MAX_COMPARE = 4;
   const toggleSelected = (code: number) => {
     setSelected((prev) =>
       prev.includes(code)
@@ -60,6 +90,11 @@ export function PlayerExplorer({
       return true;
     });
   }, [players, q, pos, teamFilter, availableOnly, ownedOnly]);
+
+  const sortedForCards = useMemo(
+    () => [...filtered].sort((a, b) => b.totalPoints - a.totalPoints),
+    [filtered],
+  );
 
   const columns: Column<PlayerSeasonRow>[] = [
     {
@@ -174,84 +209,92 @@ export function PlayerExplorer({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[10rem] flex-1">
-          <IconSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-subtle" />
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search players…"
-            className="h-9 w-full rounded-full border border-border bg-surface-1 pl-9 pr-3 text-sm outline-none transition-colors focus:border-accent"
+      <div className="glass sticky top-0 z-10 -mx-4 flex flex-col gap-2.5 border-b border-border px-4 py-3 sm:mx-0 sm:rounded-2xl sm:border">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-[10rem] flex-1">
+            <IconSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-subtle" />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search players…"
+              className="h-9 w-full rounded-full border border-border bg-surface-1 pl-9 pr-3 text-sm outline-none transition-colors focus:border-accent"
+            />
+          </div>
+          <SegmentedControl
+            size="sm"
+            value={pos}
+            onChange={setPos}
+            options={POSITIONS.map((p) => ({ label: p, value: p }))}
           />
-        </div>
-        <SegmentedControl
-          size="sm"
-          value={pos}
-          onChange={setPos}
-          options={POSITIONS.map((p) => ({ label: p, value: p }))}
-        />
-      </div>
-      <div className="flex flex-wrap items-center gap-2 text-xs">
-        <select
-          value={teamFilter}
-          onChange={(e) => setTeamFilter(e.target.value)}
-          className="h-8 rounded-lg border border-border bg-surface-1 px-2 outline-none"
-        >
-          <option value="ALL">All teams</option>
-          {teams.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
-        <label className="flex items-center gap-1.5">
-          <input
-            type="checkbox"
-            checked={availableOnly}
-            onChange={(e) => setAvailableOnly(e.target.checked)}
-          />
-          Available only
-        </label>
-        <label className="flex items-center gap-1.5">
-          <input type="checkbox" checked={ownedOnly} onChange={(e) => setOwnedOnly(e.target.checked)} />
-          In my squad
-        </label>
-        <span className="ml-auto text-fg-subtle">{filtered.length} players</span>
-      </div>
-
-      <DataTable
-        data={filtered}
-        columns={columns}
-        rowKey={(p) => p.playerCode}
-        dense
-        initialSort={{ key: "pts", dir: "desc" }}
-        onRowClick={(p) => router.push(`/players/${p.playerCode}`)}
-      />
-
-      {selected.length > 0 && (
-        <div className="fixed inset-x-0 bottom-20 z-30 flex justify-center px-4 md:bottom-6">
-          <div className="glass flex items-center gap-3 rounded-full border border-border-strong px-4 py-2 shadow-[var(--shadow-pop)]">
-            <span className="text-xs font-semibold text-fg-muted">
-              {selected.length} selected{" "}
-              <span className="text-fg-subtle">(up to {MAX_COMPARE})</span>
-            </span>
+          <div className="ml-auto flex items-center gap-1 rounded-full border border-border bg-surface-1 p-0.5">
             <button
-              onClick={() => setSelected([])}
-              className="text-xs font-semibold text-fg-subtle transition-colors hover:text-fg"
+              onClick={() => setView("cards")}
+              className={`flex h-7 w-7 items-center justify-center rounded-full transition-colors ${
+                view === "cards" ? "bg-accent text-[var(--accent-contrast)]" : "text-fg-subtle hover:text-fg"
+              }`}
+              aria-label="Card view"
             >
-              Clear
+              <IconGrid className="h-3.5 w-3.5" />
             </button>
             <button
-              disabled={selected.length < 2}
-              onClick={() => router.push(`/players/compare?codes=${selected.join(",")}`)}
-              className="rounded-full px-3.5 py-1.5 text-xs font-bold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
-              style={{ background: "linear-gradient(135deg, var(--accent), var(--brand-purple-bright))" }}
+              onClick={() => setView("table")}
+              className={`flex h-7 w-7 items-center justify-center rounded-full transition-colors ${
+                view === "table" ? "bg-accent text-[var(--accent-contrast)]" : "text-fg-subtle hover:text-fg"
+              }`}
+              aria-label="Table view"
             >
-              Compare →
+              <IconList className="h-3.5 w-3.5" />
             </button>
           </div>
         </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={teamFilter}
+            onChange={(e) => setTeamFilter(e.target.value)}
+            className="h-8 rounded-full border border-border bg-surface-1 px-3 text-xs outline-none transition-colors focus:border-accent"
+          >
+            <option value="ALL">All teams</option>
+            {teams.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+          <Toggle checked={availableOnly} onChange={setAvailableOnly} label="Available only" />
+          <Toggle checked={ownedOnly} onChange={setOwnedOnly} label="In my squad" />
+          <span className="ml-auto text-xs text-fg-subtle">{filtered.length} players</span>
+        </div>
+      </div>
+
+      {view === "cards" ? (
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
+          {sortedForCards.map((p) => (
+            <PlayerTile
+              key={p.playerCode}
+              player={p}
+              selected={selected.includes(p.playerCode)}
+              onToggleSelect={() => toggleSelected(p.playerCode)}
+              onOpen={() => router.push(`/players/${p.playerCode}`)}
+            />
+          ))}
+          {sortedForCards.length === 0 && (
+            <div className="col-span-full py-10 text-center text-sm text-fg-subtle">
+              No players match your filters.
+            </div>
+          )}
+        </div>
+      ) : (
+        <DataTable
+          data={filtered}
+          columns={columns}
+          rowKey={(p) => p.playerCode}
+          dense
+          initialSort={{ key: "pts", dir: "desc" }}
+          onRowClick={(p) => router.push(`/players/${p.playerCode}`)}
+        />
       )}
+
+      <CompareBar selectedCodes={selected} max={MAX_COMPARE} onClear={() => setSelected([])} />
     </div>
   );
 }
