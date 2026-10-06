@@ -110,6 +110,25 @@ export function IconSearch({ className }: IconProps) {
   );
 }
 
+export function IconGrid({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <rect x="3" y="3" width="8" height="8" rx="1.5" />
+      <rect x="13" y="3" width="8" height="8" rx="1.5" />
+      <rect x="3" y="13" width="8" height="8" rx="1.5" />
+      <rect x="13" y="13" width="8" height="8" rx="1.5" />
+    </svg>
+  );
+}
+
+export function IconFilter({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M4 5h16M7 12h10M10 19h4" />
+    </svg>
+  );
+}
+
 export function IconList({ className }: IconProps) {
   return (
     <svg {...base} className={className}>
