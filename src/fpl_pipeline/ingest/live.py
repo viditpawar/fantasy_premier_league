@@ -2,7 +2,7 @@
 
 import psycopg
 
-from fpl_pipeline.api.fpl_client import FPLAuthError, FPLClient
+from fpl_pipeline.api.fpl_client import FPLClient
 from fpl_pipeline.config import FPL_EMAIL, FPL_PASSWORD, FPL_TEAM_ID, current_season
 from fpl_pipeline.db.connection import get_connection
 
@@ -445,7 +445,10 @@ def run_full_ingest() -> None:
     if FPL_EMAIL and FPL_PASSWORD:
         try:
             client.login(FPL_EMAIL, FPL_PASSWORD)
-        except FPLAuthError as exc:
+        except Exception as exc:  # noqa: BLE001 - login is a nicety (real sell price),
+            # never worth failing the whole ingest over: a bad password, a network
+            # blip, or FPL changing their login endpoint should all degrade to the
+            # unauthenticated now_cost-based budget approximation, not crash here.
             print(f"  [auth] FPL login failed, continuing unauthenticated: {exc}")
     bootstrap = client.bootstrap_static()
     fixtures = client.fixtures()
