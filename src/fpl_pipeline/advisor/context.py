@@ -114,6 +114,24 @@ def get_recent_form(
     return form
 
 
+def get_season_yellow_cards(
+    conn: psycopg.Connection, season: str, player_codes: list[int]
+) -> dict[int, int]:
+    """Accumulated yellow cards this season, per player — used to flag
+    suspension risk (FPL bans at 5 yellows, then again every 5 after that
+    until the 2nd threshold at 10, which is a 2-match ban)."""
+    rows = conn.execute(
+        """
+        select player_code, sum(yellow_cards) as total
+        from player_gameweek_stats
+        where season = %s and player_code = any(%s)
+        group by player_code
+        """,
+        (season, player_codes),
+    ).fetchall()
+    return {code: total or 0 for code, total in rows}
+
+
 def get_upcoming_fixtures(
     conn: psycopg.Connection, season: str, team_ids: list[int], n: int = 3
 ) -> dict[int, list[dict]]:
@@ -249,12 +267,14 @@ def build_context(conn: psycopg.Connection) -> dict:
     fixtures = get_upcoming_fixtures(conn, season, all_team_ids)
     budget = get_budget(conn, team_id, season, gameweek)
     free_transfers = get_free_transfers(conn, team_id, season, gameweek)
+    yellow_cards = get_season_yellow_cards(conn, season, player_codes)
 
     for player in squad:
         player["recent_form"] = form.get(player["player_code"], [])
         player["upcoming_fixtures"] = fixtures.get(player["team_id"], [])
         player["score"] = compute_score(player["recent_form"], player["upcoming_fixtures"])
         player["captain_score"] = compute_captain_score(player["recent_form"], player["upcoming_fixtures"])
+        player["season_yellow_cards"] = yellow_cards.get(player["player_code"], 0)
 
     for candidate in all_candidates:
         candidate["recent_form"] = form.get(candidate["player_code"], [])
@@ -285,6 +305,10 @@ def _flag_replacement_candidates(squad: list[dict], candidates: dict[str, list[d
             player["flag"] = "a_unavailable_status"
         elif player["chance_of_playing_next_round"] is not None and player["chance_of_playing_next_round"] < 75:
             player["flag"] = "b_low_chance_of_playing"
+        elif player["season_yellow_cards"] in (4, 9):
+            # FPL bans at 5 accumulated yellows (1 match), then again at 10
+            # (2 matches) — 4 or 9 means the very next booking triggers it.
+            player["flag"] = "b2_suspension_risk"
         elif starting and player["recent_form"] and player["recent_form"][0]["minutes"] == 0:
             # 0 minutes only matters as a rotation-risk signal for players
             # who were actually selected to start — a bench player sitting

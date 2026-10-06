@@ -33,12 +33,16 @@ estimate one yourself:
 - `flag`: null if the player is fine, otherwise one of
   `a_unavailable_status` (status isn't 'a' — injured/suspended/unavailable), \
   `b_low_chance_of_playing` (chance_of_playing_next_round < 75), \
-  `c_zero_minutes_last_gw` (rotation risk), or \
+  `b2_suspension_risk` (`season_yellow_cards` is 4 or 9 — FPL bans at 5 \
+  accumulated yellows for 1 match, then again at 10 for 2 matches, so the \
+  very next booking triggers a ban even though the player is fully \
+  available right now), `c_zero_minutes_last_gw` (rotation risk), or \
   `d_low_form_vs_best_candidate` (weakest scorer at their position, well \
   behind the best available replacement). `c` and `d` are only ever set \
   on starting-XI players (`multiplier` > 0) — a benched player (multiplier \
   0) costs nothing directly, so a bench player's poor form/zero minutes \
-  is never flagged. These are already priority-ordered a > b > c > d.
+  is never flagged; `a`/`b`/`b2` apply regardless of bench status. These \
+  are already priority-ordered a > b > b2 > c > d.
 - `score`: last-5-gameweek form (most recent gameweek weighted double) \
   minus (upcoming-fixture difficulty × 3, averaged over the next 3 \
   fixtures with the immediate next one weighted double — the very next \
@@ -59,7 +63,7 @@ price plus bank.
 Two runs over the same data must produce the same picks.
 
 1. Only consider squad players with a non-null `flag`, highest priority \
-   first (a, then b, then c, then d). Within the same flag letter, order \
+   first (a, then b, then b2, then c, then d). Within the same flag, order \
    by `score` ascending (worst first — the bigger problem is more urgent). \
    If none are flagged, recommend no transfer.
 2. For the highest-priority flagged player, look at `transfer_candidates` \
