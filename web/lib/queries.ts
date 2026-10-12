@@ -2,6 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   AdvisorSuggestion,
   Budget,
+  ChipAdvice,
+  ChipRecommendation,
   GameweekHistoryPoint,
   GameweekMeta,
   LeagueRival,
@@ -236,8 +238,23 @@ export async function getAdvisorSuggestion(
     vice_captain: string;
     captaincy_reasoning: string;
     lineup_watch?: string[];
+    chip_advice?: {
+      wildcard: ChipRecommendation;
+      free_hit: ChipRecommendation;
+      bench_boost: ChipRecommendation;
+      triple_captain: ChipRecommendation;
+    };
     summary: string;
   };
+
+  const chipAdvice: ChipAdvice | null = suggestion.chip_advice
+    ? {
+        wildcard: suggestion.chip_advice.wildcard,
+        freeHit: suggestion.chip_advice.free_hit,
+        benchBoost: suggestion.chip_advice.bench_boost,
+        tripleCaptain: suggestion.chip_advice.triple_captain,
+      }
+    : null;
 
   return {
     forGameweek: data.for_gameweek,
@@ -249,6 +266,7 @@ export async function getAdvisorSuggestion(
     viceCaptain: suggestion.vice_captain,
     captaincyReasoning: suggestion.captaincy_reasoning,
     lineupWatch: suggestion.lineup_watch ?? [],
+    chipAdvice,
     summary: suggestion.summary,
   };
 }

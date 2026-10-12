@@ -65,6 +65,18 @@ export interface SuggestedTransfer {
   reasoning: string;
 }
 
+export interface ChipRecommendation {
+  recommended: boolean;
+  reason: string;
+}
+
+export interface ChipAdvice {
+  wildcard: ChipRecommendation;
+  freeHit: ChipRecommendation;
+  benchBoost: ChipRecommendation;
+  tripleCaptain: ChipRecommendation;
+}
+
 export interface AdvisorSuggestion {
   forGameweek: number;
   freeTransfers: number;
@@ -75,6 +87,7 @@ export interface AdvisorSuggestion {
   viceCaptain: string;
   captaincyReasoning: string;
   lineupWatch: string[];
+  chipAdvice: ChipAdvice | null;
   summary: string;
 }
 
