@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/Badge";
 import { TransferCompare } from "@/components/TransferCompare";
 import { FDRCell } from "@/components/ui/FDRCell";
 import { Hero } from "@/components/ui/Hero";
-import { IconSwap } from "@/components/icons";
+import { IconAlertTriangle, IconSwap } from "@/components/icons";
 import type { PlayerSeasonRow } from "@/lib/types";
 
 function CaptainFixtures({
@@ -62,6 +62,30 @@ export default async function TransfersPage() {
         </EmptyState>
       ) : (
         <>
+          {suggestion.lineupWatch.length > 0 && (
+            <section className="mb-6">
+              <div
+                className="card overflow-hidden border-l-4"
+                style={{ borderLeftColor: "var(--warning)" }}
+              >
+                <div className="flex items-center gap-2 border-b border-border bg-[color-mix(in_oklab,var(--warning)_10%,transparent)] px-4 py-2.5">
+                  <IconAlertTriangle className="h-4 w-4 shrink-0 text-[var(--warning)]" />
+                  <span className="text-sm font-bold text-fg">
+                    Lineup watch — check before the deadline
+                  </span>
+                </div>
+                <ul className="flex flex-col gap-2.5 px-4 py-3.5 text-sm text-fg-muted">
+                  {suggestion.lineupWatch.map((note, i) => (
+                    <li key={i} className="flex gap-2">
+                      <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-[var(--warning)]" />
+                      {note}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </section>
+          )}
+
           <section className="mb-6">
             <SectionHeader
               title="Free transfer — ranked options"

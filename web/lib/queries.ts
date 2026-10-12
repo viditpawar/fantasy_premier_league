@@ -235,6 +235,7 @@ export async function getAdvisorSuggestion(
     captain: string;
     vice_captain: string;
     captaincy_reasoning: string;
+    lineup_watch?: string[];
     summary: string;
   };
 
@@ -247,6 +248,7 @@ export async function getAdvisorSuggestion(
     captain: suggestion.captain,
     viceCaptain: suggestion.vice_captain,
     captaincyReasoning: suggestion.captaincy_reasoning,
+    lineupWatch: suggestion.lineup_watch ?? [],
     summary: suggestion.summary,
   };
 }

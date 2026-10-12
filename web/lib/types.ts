@@ -74,6 +74,7 @@ export interface AdvisorSuggestion {
   captain: string;
   viceCaptain: string;
   captaincyReasoning: string;
+  lineupWatch: string[];
   summary: string;
 }
 
