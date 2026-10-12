@@ -245,6 +245,117 @@ def compute_captain_score(recent_form: list[dict], fixtures: list[dict]) -> floa
     return round(form - (next_diff * 2 if next_diff is not None else 0.0), 1)
 
 
+def get_squad_fixture_counts(
+    conn: psycopg.Connection, season: str, team_ids: list[int], from_gameweek: int, lookahead: int = 8
+) -> dict[int, dict[int, int]]:
+    """How many fixtures each of the given teams has in each of the next
+    `lookahead` gameweeks — 0 means a blank, 2+ means a double. Used for
+    chip timing (Free Hit / Bench Boost / Triple Captain), not for scoring.
+    """
+    rows = conn.execute(
+        """
+        select gameweek, team_h, team_a from fixtures
+        where season = %s and gameweek is not null
+            and gameweek > %s and gameweek <= %s
+        """,
+        (season, from_gameweek, from_gameweek + lookahead),
+    ).fetchall()
+    counts: dict[int, dict[int, int]] = {}
+    team_id_set = set(team_ids)
+    for gw, team_h, team_a in rows:
+        bucket = counts.setdefault(gw, {t: 0 for t in team_id_set})
+        if team_h in team_id_set:
+            bucket[team_h] = bucket.get(team_h, 0) + 1
+        if team_a in team_id_set:
+            bucket[team_a] = bucket.get(team_a, 0) + 1
+    return counts
+
+
+def compute_chip_advice(
+    conn: psycopg.Connection, season: str, squad: list[dict], gameweek: int
+) -> dict:
+    """Deterministic chip-timing check — no judgment call involved, so
+    computed here in Python rather than left for a human/LLM to reason
+    about each time. Wildcard looks at current squad health; the other
+    three look ahead at the squad's own clubs' fixture counts for an
+    actual double or blank gameweek, since Bench Boost / Triple Captain /
+    Free Hit are only genuinely strong around one of those.
+    """
+    flagged = [p for p in squad if p.get("flag")]
+    wildcard = {
+        "recommended": len(flagged) >= 4,
+        "reason": (
+            f"{len(flagged)} squad players are flagged right now "
+            f"({', '.join(p['player'] for p in flagged)}) — fixing that many "
+            "issues one transfer at a time would cost more hits than a Wildcard's "
+            "unlimited free reshuffle."
+            if len(flagged) >= 4
+            else f"Only {len(flagged)} squad player{'s' if len(flagged) != 1 else ''} "
+            "flagged right now — not enough simultaneous problems to justify burning "
+            "the Wildcard over regular transfers."
+        ),
+    }
+
+    team_ids = sorted({p["team_id"] for p in squad})
+    fixture_counts = get_squad_fixture_counts(conn, season, team_ids, gameweek)
+
+    blank_gw, blank_teams = None, []
+    double_gw, double_teams = None, []
+    for gw in sorted(fixture_counts):
+        counts = fixture_counts[gw]
+        blanks = [t for t in team_ids if counts.get(t, 0) == 0]
+        doubles = [t for t in team_ids if counts.get(t, 0) >= 2]
+        if blanks and blank_gw is None:
+            blank_gw, blank_teams = gw, blanks
+        if doubles and double_gw is None:
+            double_gw, double_teams = gw, doubles
+
+    free_hit = (
+        {
+            "recommended": len(blank_teams) >= 3,
+            "reason": f"GW{blank_gw} is a blank for {len(blank_teams)} of your squad's clubs — "
+            "a strong Free Hit week if it holds up as the schedule firms up."
+            if blank_gw and len(blank_teams) >= 3
+            else f"GW{blank_gw} has a blank for {len(blank_teams)} squad club(s) — not enough "
+            "to justify a Free Hit over just taking the points hit on the bench."
+            if blank_gw
+            else f"No blank gameweek in the next 8 gameweeks (through GW{gameweek + 8}) for any "
+            "of your squad's clubs — nothing to Free Hit around yet.",
+        }
+    )
+    bench_boost = (
+        {
+            "recommended": len(double_teams) >= 4,
+            "reason": f"GW{double_gw} is a double for {len(double_teams)} of your squad's clubs — "
+            "worth planning a Bench Boost around if your bench is also doubled up by then."
+            if double_gw and len(double_teams) >= 4
+            else f"GW{double_gw} has a double for {len(double_teams)} squad club(s) — not enough "
+            "of the squad to make Bench Boost worth it yet."
+            if double_gw
+            else f"No double gameweek in the next 8 gameweeks (through GW{gameweek + 8}) for any "
+            "of your squad's clubs — nothing to Bench Boost around yet.",
+        }
+    )
+    triple_captain = (
+        {
+            "recommended": double_gw is not None,
+            "reason": f"GW{double_gw} gives {len(double_teams)} squad club(s) two fixtures — "
+            "if your best captain option is one of them when it's closer, that's a real "
+            "Triple Captain week."
+            if double_gw
+            else f"No double gameweek in the next 8 gameweeks (through GW{gameweek + 8}) — "
+            "hold Triple Captain for one, rather than spending it on a single fixture.",
+        }
+    )
+
+    return {
+        "wildcard": wildcard,
+        "free_hit": free_hit,
+        "bench_boost": bench_boost,
+        "triple_captain": triple_captain,
+    }
+
+
 def build_context(conn: psycopg.Connection) -> dict:
     season = get_current_season(conn)
     team_id = get_team_id(conn)
@@ -286,6 +397,7 @@ def build_context(conn: psycopg.Connection) -> dict:
         candidate["score"] = compute_score(candidate["recent_form"], candidate["upcoming_fixtures"])
 
     _flag_replacement_candidates(squad, candidates)
+    chip_advice = compute_chip_advice(conn, season, squad, gameweek)
 
     return {
         "season": season,
@@ -295,6 +407,7 @@ def build_context(conn: psycopg.Connection) -> dict:
         "budget": budget,
         "squad": squad,
         "transfer_candidates": candidates,
+        "chip_advice": chip_advice,
     }
 
 

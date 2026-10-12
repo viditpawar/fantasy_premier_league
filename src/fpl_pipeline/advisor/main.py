@@ -194,7 +194,11 @@ unless one is clearly worth it. Both are empty lists if nothing applies. \
 `lineup_watch` is the rule-8 bench check — empty list only if no bench \
 player matches either condition there; this is separate from and in \
 addition to anything already said in a transfer's own reasoning. Use \
-the exact player web names from the squad/candidate data given.
+the exact player web names from the squad/candidate data given. Don't \
+include a `chip_advice` key — Wildcard/Free Hit/Bench Boost/Triple \
+Captain timing is a fixture-count lookup with no judgment call involved, \
+so it's computed separately and added automatically; nothing you write \
+here affects it.
 """
 
 REQUIRED_SUGGESTION_KEYS = {
@@ -245,6 +249,10 @@ def extract_suggestion(response_text: str) -> dict:
 
 
 def write_suggestion(context: dict, suggestion: dict) -> None:
+    # Chip timing is fully deterministic (a fixture-count lookup, no judgment
+    # call) — computed in Python and always injected here rather than trusted
+    # from a manually-applied reply, which could transcribe or invent it wrong.
+    suggestion = {**suggestion, "chip_advice": context["chip_advice"]}
     with get_connection() as conn:
         team_id = conn.execute("select team_id from managers limit 1").fetchone()[0]
         conn.execute(

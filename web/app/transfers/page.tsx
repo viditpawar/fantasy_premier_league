@@ -5,6 +5,7 @@ import { SectionHeader } from "@/components/ui/SectionHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Badge } from "@/components/ui/Badge";
 import { TransferCompare } from "@/components/TransferCompare";
+import { ChipStrategy } from "@/components/ChipStrategy";
 import { FDRCell } from "@/components/ui/FDRCell";
 import { Hero } from "@/components/ui/Hero";
 import { IconAlertTriangle, IconSwap } from "@/components/icons";
@@ -146,6 +147,16 @@ export default async function TransfersPage() {
               <p className="text-sm text-fg-muted">{suggestion.captaincyReasoning}</p>
             </div>
           </section>
+
+          {suggestion.chipAdvice && (
+            <section className="mt-6">
+              <SectionHeader
+                title="Chip strategy"
+                hint="Wildcard looks at current squad health; the other three look ahead for an actual double or blank gameweek — they'll stay on hold until one is scheduled."
+              />
+              <ChipStrategy advice={suggestion.chipAdvice} />
+            </section>
+          )}
 
           <footer className="mt-6 flex flex-col items-center gap-2 text-center text-[11px] text-fg-subtle">
             <Badge tone="neutral">
