@@ -154,6 +154,15 @@ export function IconClock({ className }: IconProps) {
   );
 }
 
+export function IconAlertTriangle({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M12 3.5 2.5 20h19L12 3.5Z" />
+      <path d="M12 9.5v4.5M12 17h.01" />
+    </svg>
+  );
+}
+
 export function IconStar({ className }: IconProps) {
   return (
     <svg {...base} fill="currentColor" stroke="none" className={className}>

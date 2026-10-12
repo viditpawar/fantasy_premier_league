@@ -123,6 +123,27 @@ Two runs over the same data must produce the same picks.
    — otherwise the transfer's benefit won't score any points this \
    gameweek.
 
+8. Lineup watch — independent of any transfer recommended above. Bench \
+   points never count, and a transfer suggestion only touches one \
+   position; it's easy for a separate problem sitting elsewhere on the \
+   bench to go unmentioned. So, separately from the transfer section, \
+   check every bench player (`multiplier` 0) against the following and \
+   list each match in `lineup_watch`:
+   - Their `flag` is `a_unavailable_status` or `b_low_chance_of_playing` \
+     (a game-time fitness call) — regardless of their `score`. Name them, \
+     their `chance_of_playing_next_round` and `news`, and say explicitly \
+     that the manager should check final fitness news before the \
+     deadline and weigh starting them if cleared.
+   - Their `score` exceeds the weakest starting-XI player's `score` at \
+     the same position by more than 5 — name both players, both scores, \
+     and say the manager should consider starting the bench player \
+     instead.
+   A bench player can trigger both checks; still only one entry for \
+   them, mentioning whichever applies (or both). Leave `lineup_watch` an \
+   empty list only if no bench player matches either condition — don't \
+   skip this check just because a transfer was already recommended \
+   elsewhere in the squad.
+
 ## Early-season caution
 
 If a squad or candidate player's `recent_form` has fewer than 3 \
@@ -162,6 +183,7 @@ exactly this shape:
   "captain": "...",
   "vice_captain": "...",
   "captaincy_reasoning": "...",
+  "lineup_watch": ["one sentence per bench player flagged by rule 8, naming them explicitly"],
   "summary": "one or two sentence overall summary"
 }
 
@@ -169,7 +191,10 @@ exactly this shape:
 first (index 0 = the one to actually make). `hit_transfers` holds only \
 transfers you'd recommend paying 4 points for — leave it an empty list \
 unless one is clearly worth it. Both are empty lists if nothing applies. \
-Use the exact player web names from the squad/candidate data given.
+`lineup_watch` is the rule-8 bench check — empty list only if no bench \
+player matches either condition there; this is separate from and in \
+addition to anything already said in a transfer's own reasoning. Use \
+the exact player web names from the squad/candidate data given.
 """
 
 REQUIRED_SUGGESTION_KEYS = {
