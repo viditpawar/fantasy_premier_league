@@ -4,9 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NAV_LINKS, isActive } from "./navLinks";
 
-// Mobile-only tab bar. A trimmed subset of the nav for thumb reach.
+// Mobile-only tab bar. A trimmed subset of the nav for thumb reach —
+// Transfers was missing here even though it's a core weekly-use page.
 const MOBILE_LINKS = NAV_LINKS.filter((l) =>
-  ["/", "/live", "/fixtures", "/players", "/leagues"].includes(l.href),
+  ["/", "/live", "/transfers", "/fixtures", "/players", "/leagues"].includes(l.href),
 );
 
 export function BottomNav() {
@@ -22,11 +23,11 @@ export function BottomNav() {
             <Link
               key={link.href}
               href={link.href}
-              className={`flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-semibold transition-colors ${
+              className={`flex flex-1 flex-col items-center gap-0.5 px-0.5 py-2 text-[9px] font-semibold whitespace-nowrap transition-colors ${
                 active ? "text-accent" : "text-fg-muted"
               }`}
             >
-              <Icon className="h-5 w-5" />
+              <Icon className="h-5 w-5 shrink-0" />
               {link.label}
             </Link>
           );
