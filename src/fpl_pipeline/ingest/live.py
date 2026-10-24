@@ -1,5 +1,7 @@
 """Ingest the current season's live FPL data into Postgres."""
 
+from datetime import UTC, datetime
+
 import psycopg
 
 from fpl_pipeline.api.fpl_client import FPLClient
@@ -440,6 +442,7 @@ def ingest_leagues(conn: psycopg.Connection, season: str, client: FPLClient, tea
 
 
 def run_full_ingest() -> None:
+    started_at = datetime.now(UTC)
     season = current_season()
     client = FPLClient()
     if FPL_EMAIL and FPL_PASSWORD:
@@ -448,7 +451,7 @@ def run_full_ingest() -> None:
         except Exception as exc:  # noqa: BLE001 - login is a nicety (real sell price),
             # never worth failing the whole ingest over: a bad password, a network
             # blip, or FPL changing their login endpoint should all degrade to the
-            # unauthenticated now_cost-based budget approximation, not crash here.
+            # unauthenticated snapshot with unknown selling values, not crash here.
             print(f"  [auth] FPL login failed, continuing unauthenticated: {exc}")
     bootstrap = client.bootstrap_static()
     fixtures = client.fixtures()
@@ -464,6 +467,16 @@ def run_full_ingest() -> None:
             entry = client.entry(team_id)
             ingest_manager(conn, season, client, team_id, entry)
             ingest_leagues(conn, season, client, team_id, entry)
+        conn.execute(
+            """
+            INSERT INTO data_refresh_status (season, started_at, completed_at)
+            VALUES (%s, %s, clock_timestamp())
+            ON CONFLICT (season) DO UPDATE SET
+                started_at = EXCLUDED.started_at,
+                completed_at = EXCLUDED.completed_at
+            """,
+            (season, started_at),
+        )
         conn.commit()
 
 

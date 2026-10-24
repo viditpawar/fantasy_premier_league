@@ -4,7 +4,7 @@ import { getSupabase } from "@/lib/supabase";
 import {
   getCurrentSeason,
   getFixtureTickerData,
-  getGameweekMeta,
+  getPlanningGameweek,
   getLatestGameweek,
   getSquad,
   getTeamId,
@@ -26,8 +26,8 @@ export default async function FixturesPage(props: PageProps<"/fixtures">) {
   const sb = getSupabase();
   const season = await getCurrentSeason(sb);
   const teamId = await getTeamId(sb).catch(() => null);
-  const { current, next } = await getGameweekMeta(sb, season);
-  const fromGw = (current && !current.finished ? current.id : next?.id) ?? 1;
+  const nextWeek = await getPlanningGameweek(sb, season);
+  const fromGw = nextWeek ?? 39;
 
   let ownedTeamIds: number[] = [];
   if (teamId) {
@@ -56,7 +56,7 @@ export default async function FixturesPage(props: PageProps<"/fixtures">) {
         icon={<IconCalendar className="h-4 w-4" />}
         eyebrow="Difficulty ticker"
         title="Fixture ticker"
-        subtitle={`Mapped from GW${fromGw} onward · tap a club to drill in`}
+        subtitle={nextWeek ? `Plan from GW${fromGw} onward · tap a club to drill in` : "There are no future deadlines in this season's calendar."}
       />
 
       {teamDetail?.team && (

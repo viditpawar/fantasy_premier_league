@@ -26,14 +26,22 @@ dashboard, and an LLM-based transfer/captaincy advisor.
 - **Squad** — live formation view of your current squad: captain/vice-captain,
   injury/suspension flags, next-fixture difficulty, points per player.
 - **Dashboard** — season points history, overall rank, and top scorers.
-- **Transfers** — an AI-generated shortlist of transfer ideas each gameweek:
-  up to 3 ranked free-transfer options (best one highlighted) plus a
-  separate call on whether any transfer is worth a -4 point hit, and a
-  captain/vice-captain pick.
+- **Watchlist & player explorer** — save players on this device, keep comparison
+  selections, and filter by budget, minutes, ownership, club and availability.
+- **Transfer planner** — draft up to five weeks with current-squad setup,
+  actual selling values, free-transfer rollover, club limits and hit costs.
+- **Squad outlook & fixtures** — formation-aware coverage, blanks, doubles,
+  selectable start weeks and difficulty averaged per scheduled match.
+- **AI advisor** — manually generated, validated transfer alternatives and
+  captaincy advice. Heuristic scores cannot justify paid-hit recommendations.
+- **Data freshness** — last successful ingest timestamps and stale-data notices.
 - **Leagues & Cups** — every classic and head-to-head league you're in, with
   your rank and its change since last gameweek; classic leagues also get a
   full standings table with your row highlighted.
 - **Grafana dashboard** — an alternate view of the same warehouse for local/self-hosted use.
+
+See [the planning guide](docs/planning.md) for the watchlist, planner, fixture
+outlook, local storage and snapshot-export workflow.
 
 ## Architecture
 

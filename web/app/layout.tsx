@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { DataFreshness } from "@/components/DataFreshness";
 import { Nav } from "@/components/Nav";
 import { Sidebar } from "@/components/Sidebar";
 import { BottomNav } from "@/components/BottomNav";
@@ -44,7 +45,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <Nav season={shell.season} manager={shell.manager} />
         <div id="main-content" tabIndex={-1} className="pb-20 outline-none md:pb-0">
           <PageTransition>{children}</PageTransition>
-          <footer className="page-container !pt-0"><div className="app-footer"><span>Made for the love of the game.<span className="mx-2 text-border-strong">·</span>FPL Cockpit</span><span>Independent of the Premier League.<span className="mx-2 text-border-strong">·</span><Link href="/settings" className="hover:text-fg">Data & information ↗</Link></span></div></footer>
+          <footer className="page-container !pt-0"><div className="app-footer"><span><DataFreshness compact /><br />Made for the love of the game.<span className="mx-2 text-border-strong">·</span>FPL Cockpit</span><span>Independent of the Premier League.<span className="mx-2 text-border-strong">·</span><Link href="/settings" className="hover:text-fg">Data & information ↗</Link></span></div></footer>
         </div>
       </div>
       <BottomNav /><CommandPalette items={shell.commandItems} />

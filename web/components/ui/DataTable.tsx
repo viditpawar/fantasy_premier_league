@@ -27,6 +27,7 @@ export function DataTable<T>({
   rowClassName,
   dense = false,
   emptyLabel = "Nothing to show",
+  pageSize,
 }: {
   data: T[];
   columns: Column<T>[];
@@ -36,8 +37,10 @@ export function DataTable<T>({
   rowClassName?: (row: T) => string;
   dense?: boolean;
   emptyLabel?: string;
+  pageSize?: number;
 }) {
   const [sort, setSort] = useState(initialSort ?? null);
+  const [page, setPage] = useState(0);
 
   const sorted = useMemo(() => {
     if (!sort) return data;
@@ -53,6 +56,7 @@ export function DataTable<T>({
   }, [data, sort, columns]);
 
   function toggleSort(key: string) {
+    setPage(0);
     setSort((prev) => {
       if (prev?.key !== key) return { key, dir: "desc" };
       if (prev.dir === "desc") return { key, dir: "asc" };
@@ -61,6 +65,9 @@ export function DataTable<T>({
   }
 
   const pad = dense ? "px-4 py-3" : "px-5 py-4";
+  const pages = pageSize ? Math.max(1, Math.ceil(sorted.length / pageSize)) : 1;
+  const currentPage = Math.min(page, pages - 1);
+  const visible = pageSize ? sorted.slice(currentPage * pageSize, (currentPage + 1) * pageSize) : sorted;
 
   return (
     <div className="card overflow-hidden">
@@ -97,7 +104,7 @@ export function DataTable<T>({
                 </td>
               </tr>
             )}
-            {sorted.map((row, i) => (
+            {visible.map((row, i) => (
               <tr
                 key={rowKey(row)}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
@@ -128,6 +135,7 @@ export function DataTable<T>({
           </tbody>
         </table>
       </div>
+      {pageSize && <nav aria-label="Table pagination" className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3 text-[11px] text-fg-muted"><span>{sorted.length ? currentPage * pageSize + 1 : 0}–{Math.min((currentPage + 1) * pageSize, sorted.length)} of {sorted.length}</span><div className="flex gap-3"><button disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)} className="disabled:opacity-30">Previous</button><span>{currentPage + 1} / {pages}</span><button disabled={currentPage + 1 >= pages} onClick={() => setPage(currentPage + 1)} className="disabled:opacity-30">Next</button></div></nav>}
     </div>
   );
 }

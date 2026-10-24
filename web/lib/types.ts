@@ -8,6 +8,7 @@ export const POSITION_NAMES: Record<number, Position> = {
 };
 
 export interface UpcomingFixture {
+  gameweek: number;
   opponent: string;
   wasHome: boolean;
   difficulty: number | null;
@@ -237,7 +238,7 @@ export interface LiveGameweek {
   gameweek: number;
   finished: boolean;
   players: LivePlayer[];
-  liveTotal: number; // starting XI incl. captain multiplier
+  liveTotal: number; // all saved scoring picks, including autosubs and chips
   benchPoints: number;
   playersYetToPlay: number;
   playersPlaying: number;

@@ -40,7 +40,7 @@ export default async function PlayersPage() {
           { label: "In your squad", value: players.filter((p) => p.inSquad).length },
         ]}
       />
-      <PlayerExplorer players={players} teams={teams} />
+      <PlayerExplorer players={players} teams={teams} season={season} />
     </main>
   );
 }

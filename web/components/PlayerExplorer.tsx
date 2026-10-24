@@ -11,6 +11,10 @@ import { PlayerKit } from "./PlayerKit";
 import { CompareBar } from "./CompareBar";
 import { IconGrid, IconList, IconSearch } from "./icons";
 import { money } from "@/lib/format";
+import { parseMillions } from "@/lib/planning";
+import { parseWatchlist, useLocalState, useWatchlist } from "@/lib/local-state";
+import { WatchlistButton } from "./WatchlistButton";
+import Link from "next/link";
 
 const POSITIONS: (Position | "ALL")[] = ["ALL", "GKP", "DEF", "MID", "FWD"];
 const MAX_COMPARE = 4;
@@ -55,9 +59,13 @@ function Toggle({
 export function PlayerExplorer({
   players,
   teams,
+  season,
+  onlyWatchlist = false,
 }: {
   players: PlayerSeasonRow[];
   teams: string[];
+  season: string;
+  onlyWatchlist?: boolean;
 }) {
   const router = useRouter();
   const [q, setQ] = useState("");
@@ -65,17 +73,17 @@ export function PlayerExplorer({
   const [teamFilter, setTeamFilter] = useState("ALL");
   const [availableOnly, setAvailableOnly] = useState(false);
   const [ownedOnly, setOwnedOnly] = useState(false);
-  const [selected, setSelected] = useState<number[]>([]);
+  const [watchlist, , temporary] = useWatchlist(season);
+  const [savedOnly, setSavedOnly] = useState(onlyWatchlist);
+  const [maxPrice, setMaxPrice] = useState("");
+  const [minMinutes, setMinMinutes] = useState("");
+  const [maxOwnership, setMaxOwnership] = useState("");
+  const [selected, setSelected] = useLocalState(`fpl:compare:${season}`, [] as number[], value => parseWatchlist(value).filter(code => players.some(p => p.playerCode === code)).slice(0, MAX_COMPARE));
+  const [cardLimit, setCardLimit] = useState(48);
   const [view, setView] = useState<"table" | "cards">("table");
 
   const toggleSelected = (code: number) => {
-    setSelected((prev) =>
-      prev.includes(code)
-        ? prev.filter((c) => c !== code)
-        : prev.length < MAX_COMPARE
-          ? [...prev, code]
-          : prev,
-    );
+    setSelected(selected.includes(code) ? selected.filter(c => c !== code) : selected.length < MAX_COMPARE ? [...selected, code] : selected);
   };
 
   const filtered = useMemo(() => {
@@ -86,9 +94,13 @@ export function PlayerExplorer({
       if (teamFilter !== "ALL" && p.team !== teamFilter) return false;
       if (availableOnly && p.status !== "a") return false;
       if (ownedOnly && !p.inSquad) return false;
+      if ((onlyWatchlist || savedOnly) && !watchlist.includes(p.playerCode)) return false;
+      if (maxPrice !== "" && (parseMillions(maxPrice) == null || p.nowCost > parseMillions(maxPrice)!)) return false;
+      if (minMinutes !== "" && p.minutes < Number(minMinutes)) return false;
+      if (maxOwnership !== "" && (p.ownership == null || p.ownership > Number(maxOwnership))) return false;
       return true;
     });
-  }, [players, q, pos, teamFilter, availableOnly, ownedOnly]);
+  }, [players, q, pos, teamFilter, availableOnly, ownedOnly, onlyWatchlist, savedOnly, watchlist, maxPrice, minMinutes, maxOwnership]);
 
   const sortedForCards = useMemo(
     () => [...filtered].sort((a, b) => b.totalPoints - a.totalPoints),
@@ -96,6 +108,7 @@ export function PlayerExplorer({
   );
 
   const columns: Column<PlayerSeasonRow>[] = [
+    { key: "save", header: <span className="sr-only">Watchlist</span>, render: p => <WatchlistButton season={season} code={p.playerCode} name={p.player} compact /> },
     {
       key: "select",
       header: "",
@@ -264,16 +277,26 @@ export function PlayerExplorer({
           </select>
           <Toggle checked={availableOnly} onChange={setAvailableOnly} label="Available only" />
           <Toggle checked={ownedOnly} onChange={setOwnedOnly} label="In my squad" />
+          {!onlyWatchlist && <Toggle checked={savedOnly} onChange={setSavedOnly} label="Watchlist" />}
           <span className="ml-auto text-xs text-fg-subtle">{filtered.length} players</span>
         </div>
       </div>
 
+      <div className="card grid grid-cols-2 items-end gap-3 p-4 sm:grid-cols-4">
+        <label className="text-[10px] text-fg-muted">Maximum price (£m)<input type="number" min="0" max="200" step="0.1" aria-label="Maximum player price" value={maxPrice} onChange={e => setMaxPrice(e.target.value)} className="field-input mt-1.5" placeholder="Any price" /></label>
+        <label className="text-[10px] text-fg-muted">Minimum minutes<input type="number" min="0" step="1" aria-label="Minimum minutes" value={minMinutes} onChange={e => setMinMinutes(e.target.value)} className="field-input mt-1.5" placeholder="Any minutes" /></label>
+        <label className="text-[10px] text-fg-muted">Maximum ownership (%)<input type="number" min="0" max="100" step="0.1" aria-label="Maximum ownership" value={maxOwnership} onChange={e => setMaxOwnership(e.target.value)} className="field-input mt-1.5" placeholder="Any ownership" /></label>
+        <button className="button-secondary" onClick={() => { setQ(""); setPos("ALL"); setTeamFilter("ALL"); setAvailableOnly(false); setOwnedOnly(false); setSavedOnly(onlyWatchlist); setMaxPrice(""); setMinMinutes(""); setMaxOwnership(""); }}>Reset filters</button>
+      </div>
+      {temporary && <p role="status" className="text-xs text-warning">Device storage is unavailable. Your shortlist will last for this visit.</p>}
+      {onlyWatchlist && watchlist.length === 0 && <div className="card p-8 text-center"><h2 className="text-base font-medium">A shortlist worth coming back to.</h2><p className="mt-3 text-xs leading-6 text-fg-muted">Save players with the star beside their name. Their latest prices and form will appear here.</p><Link href="/players" className="button-primary mt-5">Find players to follow</Link></div>}
       {view === "cards" ? (
         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
-          {sortedForCards.map((p) => (
+          {sortedForCards.slice(0, cardLimit).map((p) => (
             <PlayerTile
               key={p.playerCode}
               player={p}
+              season={season}
               selected={selected.includes(p.playerCode)}
               onToggleSelect={() => toggleSelected(p.playerCode)}
               onOpen={() => router.push(`/players/${p.playerCode}`)}
@@ -284,6 +307,7 @@ export function PlayerExplorer({
               No players match your filters.
             </div>
           )}
+          {sortedForCards.length > cardLimit && <button onClick={() => setCardLimit(n => n + 48)} className="button-secondary col-span-full">Show more players</button>}
         </div>
       ) : (
         <DataTable
@@ -291,6 +315,7 @@ export function PlayerExplorer({
           columns={columns}
           rowKey={(p) => p.playerCode}
           dense
+          pageSize={40}
           initialSort={{ key: "pts", dir: "desc" }}
           onRowClick={(p) => router.push(`/players/${p.playerCode}`)}
         />
