@@ -171,6 +171,13 @@ CREATE TABLE IF NOT EXISTS advisor_suggestions (
     PRIMARY KEY (team_id, season, for_gameweek)
 );
 
+-- Committed atomically with a successful live ingest; never a page-view time.
+CREATE TABLE IF NOT EXISTS data_refresh_status (
+    season TEXT PRIMARY KEY,
+    started_at TIMESTAMPTZ NOT NULL,
+    completed_at TIMESTAMPTZ NOT NULL
+);
+
 -- Every classic/h2h league the manager belongs to, with their own current
 -- and previous rank in it (from the FPL entry endpoint).
 CREATE TABLE IF NOT EXISTS manager_leagues (
@@ -213,12 +220,13 @@ BEGIN
     IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
         FOR t IN SELECT unnest(ARRAY['teams', 'players', 'gameweeks', 'fixtures',
             'player_gameweek_stats', 'managers', 'manager_gameweek_history', 'manager_picks',
-            'advisor_suggestions', 'manager_leagues', 'league_standings'])
+            'advisor_suggestions', 'manager_leagues', 'league_standings', 'data_refresh_status'])
         LOOP
             EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
             EXECUTE format('DROP POLICY IF EXISTS public_read ON %I', t);
             EXECUTE format('CREATE POLICY public_read ON %I FOR SELECT TO anon USING (true)', t);
         END LOOP;
+        GRANT SELECT ON data_refresh_status TO anon;
     END IF;
 END $$;
 

@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getWorkspace } from "@/lib/workspace";
-import { getBudget, getGameweekMeta, getLatestGameweek, getLiveGameweek, getSquad } from "@/lib/queries";
+import { getBudget, getFixtureTickerData, getPlanningGameweek, getGameweekMeta, getLatestGameweek, getLiveGameweek, getSquad } from "@/lib/queries";
+import { SquadOutlook } from "@/components/SquadOutlook";
 import { money } from "@/lib/format";
 import { SquadView } from "@/components/SquadView";
 import { PlayerKit } from "@/components/PlayerKit";
@@ -16,6 +17,8 @@ export default async function SquadPage() {
   const gameweek = await getLatestGameweek(sb, teamId, season);
   const [squad, budget, meta, live] = await Promise.all([getSquad(sb, teamId, season, gameweek), getBudget(sb, teamId, season, gameweek), getGameweekMeta(sb, season), getLiveGameweek(sb, teamId, season).catch(() => null)]);
   const starting = squad.filter((p) => p.squadPosition <= 11);
+  const target = await getPlanningGameweek(sb, season);
+  const ticker = await getFixtureTickerData(sb, season, target ?? 39);
   const bench = squad.filter((p) => p.squadPosition > 11).sort((a, b) => a.squadPosition - b.squadPosition);
   const captain = squad.find((p) => p.isCaptain);
   const vice = squad.find((p) => p.isViceCaptain);
@@ -31,5 +34,6 @@ export default async function SquadPage() {
         <section className="rounded-2xl border border-border px-5 py-5"><p className="section-label">A little perspective</p><p className="mt-3 text-[12px] leading-6 text-fg-muted">A strong bench matters. Your substitutes appear in the order they would enter your team.</p><Link href="/fixtures" className="text-link mt-4">Plan the fixtures ahead<IconArrowRight /></Link></section>
       </div>
     </div>
+    <SquadOutlook squad={squad} {...ticker} />
   </main>;
 }

@@ -1,4 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { cache } from "react";
+import { matchweekTotals } from "./matchweek";
 import {
   AdvisorSuggestion,
   Budget,
@@ -30,7 +32,7 @@ export async function getCurrentSeason(sb: SupabaseClient): Promise<string> {
   const { data, error } = await sb
     .from("gameweeks")
     .select("season")
-    .eq("is_current", true)
+    .order("season", { ascending: false })
     .limit(1)
     .single();
   if (error) throw error;
@@ -82,17 +84,28 @@ export async function getBudget(
   };
 }
 
+export const getPlanningGameweek = cache(async (sb: SupabaseClient, season: string): Promise<number | null> => {
+  const { data, error } = await sb.from("gameweeks").select("id")
+    .eq("season", season).gt("deadline_time", new Date().toISOString())
+    .order("deadline_time", { ascending: true }).limit(1).maybeSingle();
+  if (error) throw error;
+  return data?.id ?? null;
+});
+
 async function getUpcomingFixturesForTeam(
   sb: SupabaseClient,
   season: string,
   teamId: number,
   n = 3,
 ): Promise<UpcomingFixture[]> {
+  const target = await getPlanningGameweek(sb, season);
+  if (target == null) return [];
   const { data, error } = await sb
     .from("fixtures")
-    .select("team_h, team_a, team_h_difficulty, team_a_difficulty, kickoff_time, finished")
+    .select("gameweek, team_h, team_a, team_h_difficulty, team_a_difficulty, kickoff_time, finished")
     .eq("season", season)
     .eq("finished", false)
+    .gte("gameweek", target)
     .or(`team_h.eq.${teamId},team_a.eq.${teamId}`)
     .order("kickoff_time", { ascending: true })
     .limit(n);
@@ -110,6 +123,7 @@ async function getUpcomingFixturesForTeam(
     const wasHome = f.team_h === teamId;
     const opponentId = wasHome ? f.team_a : f.team_h;
     return {
+      gameweek: f.gameweek,
       opponent: nameById.get(opponentId) ?? "?",
       wasHome,
       difficulty: wasHome ? f.team_h_difficulty : f.team_a_difficulty,
@@ -498,7 +512,7 @@ export async function getFixtureTickerData(
   gameweeks: number[];
   owned: number[];
 }> {
-  const [{ data: teams, error: tErr }, { data: fixtures, error: fErr }] = await Promise.all([
+  const [{ data: teams, error: tErr }, { data: fixtures, error: fErr }, { data: events, error: eErr }] = await Promise.all([
     sb
       .from("teams")
       .select(
@@ -512,11 +526,13 @@ export async function getFixtureTickerData(
       .gte("gameweek", fromGameweek)
       .not("gameweek", "is", null)
       .order("gameweek", { ascending: true }),
+    sb.from("gameweeks").select("id").eq("season", season).gte("id", fromGameweek).order("id"),
   ]);
   if (tErr) throw tErr;
   if (fErr) throw fErr;
+  if (eErr) throw eErr;
 
-  const gameweeks = [...new Set((fixtures ?? []).map((f) => f.gameweek as number))].sort((a, b) => a - b);
+  const gameweeks = (events ?? []).map(e => e.id as number);
 
   return {
     teams: (teams ?? []).map((t) => ({
@@ -854,23 +870,13 @@ export async function getLiveGameweek(
     };
   });
 
-  const starting = livePlayers.filter((p) => p.squadPosition <= 11);
-  const bench = livePlayers.filter((p) => p.squadPosition > 11);
-  const liveTotal = starting.reduce((s, p) => s + p.livePoints * (p.multiplier || 1), 0);
-  const benchPoints = bench.reduce((s, p) => s + p.livePoints, 0);
-  const playersYetToPlay = starting.filter((p) => p.hasFixture && !p.fixtureFinished && p.minutes === 0).length;
-  const playersPlaying = starting.filter((p) => p.hasFixture && !p.fixtureFinished && p.minutes > 0).length;
-  const captain = starting.find((p) => p.isCaptain)?.player ?? null;
+  const totals = matchweekTotals(livePlayers);
 
   return {
     gameweek,
     finished: current?.finished ?? false,
     players: livePlayers,
-    liveTotal,
-    benchPoints,
-    playersYetToPlay,
-    playersPlaying,
-    captain,
+    ...totals,
     averageEntryScore: current?.averageEntryScore ?? null,
   };
 }

@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/Badge";
 import { FDRCell } from "@/components/ui/FDRCell";
 import { AreaTrend } from "@/components/charts/AreaTrend";
 import { IconArrowLeft } from "@/components/icons";
+import { WatchlistButton } from "@/components/WatchlistButton";
 import { money, positionColor, CREST_URL } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -73,6 +74,7 @@ export default async function PlayerDetailPage(props: PageProps<"/players/[code]
         <IconArrowLeft className="h-4 w-4" /> Player explorer
       </Link>
 
+      <div className="mb-4"><WatchlistButton code={meta.playerCode} name={meta.player} season={season} /></div>
       <header className="card relative mb-5 overflow-hidden px-5 py-6 sm:px-7">
         <div className="relative flex items-center gap-5">
           <div className="relative shrink-0">

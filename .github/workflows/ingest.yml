@@ -7,6 +7,9 @@ on:
 
 jobs:
   ingest:
+    concurrency:
+      group: fpl-live-ingest
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
