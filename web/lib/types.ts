@@ -79,7 +79,10 @@ export interface ChipAdvice {
 
 export interface AdvisorSuggestion {
   forGameweek: number;
-  freeTransfers: number;
+  freeTransfers: number | null;
+  unlimitedTransfers: boolean;
+  isCurrent: boolean;
+  reviewNote: string | null;
   generatedAt: string;
   recommendedTransfers: SuggestedTransfer[];
   hitTransfers: SuggestedTransfer[];
