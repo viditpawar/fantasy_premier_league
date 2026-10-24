@@ -37,7 +37,11 @@ export function StatTile({
   hint,
 }: StatTileProps) {
   return (
-    <div className="card card-hover relative min-w-0 px-4 py-3.5">
+    <div className="card card-hover relative min-w-0 overflow-hidden px-4 py-3.5">
+      <div
+        className="absolute inset-x-0 top-0 h-[3px]"
+        style={{ background: `linear-gradient(90deg, ${accent}, transparent 150%)` }}
+      />
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="truncate text-xl font-extrabold tracking-tight text-fg sm:text-2xl">

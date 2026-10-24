@@ -1,152 +1,100 @@
 @import "tailwindcss";
 
 /*
- * Cupertino-inspired design system — modeled on Apple's Human Interface
- * Guidelines: iOS grouped-table surfaces, SF system colors, hairline
- * separators instead of heavy shadows, large bold titles, and restrained,
- * spring-like motion. Light palette on bare :root; dark overrides in the
- * two blocks below (prefers-color-scheme and [data-theme]), so the manual
- * toggle wins in both directions and no color has only a dark value.
+ * Dark-first premium design system. Dark is the default look (bare :root) —
+ * the explicit [data-theme="light"] block is the override, not the other
+ * way around, so the app opens bold and premium regardless of OS setting.
  */
 :root {
-  /* iOS systemGroupedBackground / secondarySystemGroupedBackground family */
-  --surface-0: #f2f2f7; /* page */
-  --surface-1: #ffffff; /* cards */
-  --surface-2: #eeeef1; /* insets, hover */
-  --surface-3: #e5e5ea; /* strong insets (systemGray5) */
+  --surface-0: #07070a; /* page — near-black */
+  --surface-1: #121216; /* cards */
+  --surface-2: #1c1c22; /* insets, hover */
+  --surface-3: #27272f; /* strong insets */
 
-  /* iOS label / secondaryLabel / tertiaryLabel */
-  --fg: #1c1c1e;
-  --fg-muted: #6e6e73;
-  --fg-subtle: #8e8e93;
+  --fg: #f5f5f7;
+  --fg-muted: #a3a3ad;
+  --fg-subtle: #717178;
 
-  /* iOS separator */
-  --border: rgba(60, 60, 67, 0.13);
-  --border-strong: rgba(60, 60, 67, 0.24);
+  --border: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.2);
 
   --brand-purple: #37003c;
-  --brand-purple-bright: #6a1178;
+  --brand-purple-bright: #9c27e0;
 
-  --accent: #30b356; /* systemGreen, tuned for AA contrast on white */
-  --accent-contrast: #ffffff;
-  --cyan: #0a84ff; /* systemBlue, used as the secondary data color */
+  --accent: #00e676; /* vivid neon green — the FPL brand color, turned up */
+  --accent-contrast: #022411;
+  --cyan: #22d3ee;
 
-  --fdr-1: #30b356;
-  --fdr-2: #6fcf7d;
-  --fdr-3: #aeaeb2;
-  --fdr-4: #ff9500;
-  --fdr-5: #ff3b30;
-
-  --good: #30b356;
-  --warning: #ff9500;
-  --critical: #ff3b30;
-
-  --grid: rgba(60, 60, 67, 0.1);
-  /* Apple leans on hairlines over shadow; what shadow exists is soft and shallow. */
-  --shadow-card: 0 1px 1px rgba(0, 0, 0, 0.03), 0 1px 3px rgba(0, 0, 0, 0.04);
-  --shadow-pop: 0 12px 28px -10px rgba(0, 0, 0, 0.16);
-
-  /* iOS-flavored spring approximation (overshoot-free but snappy, like a sheet push) */
-  --ease-out: cubic-bezier(0.32, 0.72, 0, 1);
-  --dur-fast: 180ms;
-  --dur-med: 320ms;
-
-  --pitch-a: #2fa85a;
-  --pitch-b: #0f7a3c;
-
-  --radius-lg: 20px;
-  --shadow-glow: var(--shadow-card);
-
-  color-scheme: light;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    /* True-black OLED dark mode, the way Settings/Health render at night */
-    --surface-0: #000000;
-    --surface-1: #1c1c1e;
-    --surface-2: #2c2c2e;
-    --surface-3: #3a3a3c;
-
-    --fg: #ffffff;
-    --fg-muted: #98989d;
-    --fg-subtle: #8e8e93;
-
-    --border: rgba(255, 255, 255, 0.14);
-    --border-strong: rgba(255, 255, 255, 0.26);
-
-    --brand-purple: #2c0a33;
-    --brand-purple-bright: #a021b3;
-
-    --accent: #30d158;
-    --accent-contrast: #04210d;
-    --cyan: #0a84ff;
-
-    --fdr-1: #30d158;
-    --fdr-2: #69e280;
-    --fdr-3: #8e8e93;
-    --fdr-4: #ff9f0a;
-    --fdr-5: #ff453a;
-
-    --good: #30d158;
-    --warning: #ff9f0a;
-    --critical: #ff453a;
-
-    --grid: rgba(255, 255, 255, 0.1);
-    --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 4px 14px rgba(0, 0, 0, 0.5);
-    --shadow-pop: 0 16px 36px -12px rgba(0, 0, 0, 0.65);
-
-    --pitch-a: #1f9d55;
-    --pitch-b: #0a6d37;
-
-    --radius-lg: 20px;
-    --shadow-glow: var(--shadow-card);
-
-    color-scheme: dark;
-  }
-}
-
-:root[data-theme="dark"] {
-  --surface-0: #000000;
-  --surface-1: #1c1c1e;
-  --surface-2: #2c2c2e;
-  --surface-3: #3a3a3c;
-
-  --fg: #ffffff;
-  --fg-muted: #98989d;
-  --fg-subtle: #8e8e93;
-
-  --border: rgba(255, 255, 255, 0.14);
-  --border-strong: rgba(255, 255, 255, 0.26);
-
-  --brand-purple: #2c0a33;
-  --brand-purple-bright: #a021b3;
-
-  --accent: #30d158;
-  --accent-contrast: #04210d;
-  --cyan: #0a84ff;
-
-  --fdr-1: #30d158;
-  --fdr-2: #69e280;
-  --fdr-3: #8e8e93;
+  --fdr-1: #00e676;
+  --fdr-2: #5fe9a0;
+  --fdr-3: #6b6b74;
   --fdr-4: #ff9f0a;
   --fdr-5: #ff453a;
 
-  --good: #30d158;
+  --good: #00e676;
   --warning: #ff9f0a;
   --critical: #ff453a;
 
-  --grid: rgba(255, 255, 255, 0.1);
-  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 4px 14px rgba(0, 0, 0, 0.5);
-  --shadow-pop: 0 16px 36px -12px rgba(0, 0, 0, 0.65);
+  --grid: rgba(255, 255, 255, 0.08);
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 8px 24px -10px rgba(0, 0, 0, 0.6);
+  --shadow-pop: 0 20px 48px -16px rgba(0, 0, 0, 0.75);
+  --shadow-glow: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 0 0 1px rgba(0, 230, 118, 0.15),
+    0 20px 48px -16px color-mix(in oklab, var(--accent) 35%, black 65%);
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-fast: 160ms;
+  --dur-med: 300ms;
 
   --pitch-a: #1f9d55;
   --pitch-b: #0a6d37;
 
-  --radius-lg: 20px;
-  --shadow-glow: var(--shadow-card);
+  --radius-lg: 24px;
 
   color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --surface-0: #f4f4f7;
+  --surface-1: #ffffff;
+  --surface-2: #ebebef;
+  --surface-3: #dedee4;
+
+  --fg: #121216;
+  --fg-muted: #55555f;
+  --fg-subtle: #85858d;
+
+  --border: rgba(18, 18, 22, 0.1);
+  --border-strong: rgba(18, 18, 22, 0.2);
+
+  --brand-purple: #37003c;
+  --brand-purple-bright: #6a1178;
+
+  --accent: #00a855;
+  --accent-contrast: #ffffff;
+  --cyan: #0891b2;
+
+  --fdr-1: #00a855;
+  --fdr-2: #52c97a;
+  --fdr-3: #9494a0;
+  --fdr-4: #e07c00;
+  --fdr-5: #d6273b;
+
+  --good: #00a855;
+  --warning: #e07c00;
+  --critical: #d6273b;
+
+  --grid: rgba(18, 18, 22, 0.08);
+  --shadow-card: 0 1px 2px rgba(18, 18, 22, 0.05), 0 8px 24px -14px rgba(18, 18, 22, 0.18);
+  --shadow-pop: 0 16px 36px -14px rgba(18, 18, 22, 0.28);
+  --shadow-glow: 0 1px 2px rgba(18, 18, 22, 0.05), 0 0 0 1px rgba(0, 168, 85, 0.12),
+    0 20px 44px -16px color-mix(in oklab, var(--accent) 30%, transparent);
+
+  --pitch-a: #2fa85a;
+  --pitch-b: #0f7a3c;
+
+  --radius-lg: 24px;
+
+  color-scheme: light;
 }
 
 @theme inline {
@@ -187,7 +135,7 @@ body {
 }
 
 ::selection {
-  background: color-mix(in oklab, var(--accent) 30%, transparent);
+  background: color-mix(in oklab, var(--accent) 35%, transparent);
   color: var(--fg);
 }
 
@@ -210,31 +158,49 @@ body {
 }
 
 .card-hover:hover {
-  transform: translateY(-1px);
+  transform: translateY(-2px);
   box-shadow: var(--shadow-pop);
+  border-color: color-mix(in oklab, var(--accent) 30%, var(--border));
 }
 
 .card-hover:active {
   transform: scale(0.985);
 }
 
-/* iOS "material" — frosted translucency used for nav bars and sheets */
 .glass {
-  background: color-mix(in oklab, var(--surface-0) 78%, transparent);
-  backdrop-filter: blur(20px) saturate(1.8);
-  -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  background: color-mix(in oklab, var(--surface-0) 70%, transparent);
+  backdrop-filter: blur(24px) saturate(1.8);
+  -webkit-backdrop-filter: blur(24px) saturate(1.8);
 }
 
-/* Large Title — the big bold iOS navigation-bar title treatment */
+.text-gradient {
+  background: linear-gradient(120deg, var(--accent) 0%, var(--cyan) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
 .large-title {
-  font-size: 2.125rem;
-  line-height: 1.1;
+  font-size: 2.25rem;
+  line-height: 1.08;
   font-weight: 800;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.03em;
   color: var(--fg);
 }
 
-/* iOS grouped list — a card whose rows are separated by hairlines, not gaps */
+/* A confident colored glow backdrop — used sparingly for hero/live moments */
+.glow-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(70% 140% at 0% 0%, color-mix(in oklab, var(--accent) 22%, transparent) 0%, transparent 60%),
+    radial-gradient(60% 100% at 100% 0%, color-mix(in oklab, var(--brand-purple-bright) 24%, transparent) 0%, transparent 60%),
+    var(--surface-1);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-glow);
+}
+
 .grouped-list > * + * {
   border-top: 1px solid var(--border);
 }
@@ -261,8 +227,8 @@ body {
 
 .section-label {
   font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--fg-subtle);
 }
@@ -280,7 +246,7 @@ body {
 /* --- motion --- */
 
 @keyframes fade-in-up {
-  from { opacity: 0; transform: translateY(6px); }
+  from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
 

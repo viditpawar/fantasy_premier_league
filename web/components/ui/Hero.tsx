@@ -24,14 +24,14 @@ export function Hero({
   accent?: string;
 }) {
   return (
-    <header className="mb-6">
+    <header className="glow-hero mb-6 px-5 pt-5 pb-4 sm:px-6 sm:pt-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           {eyebrow && (
-            <div className="mb-1 flex items-center gap-2">
+            <div className="mb-1.5 flex items-center gap-2">
               {icon && (
                 <span
-                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[7px] text-white"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] text-white shadow-[0_2px_8px_-2px_rgba(0,0,0,0.5)]"
                   style={{ background: accent }}
                 >
                   {icon}
