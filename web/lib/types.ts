@@ -190,6 +190,7 @@ export interface PlayerDetail {
 
 export interface ManagerGameweekRow {
   gameweek: number;
+  finished: boolean | null;
   points: number;
   totalPoints: number;
   overallRank: number | null;

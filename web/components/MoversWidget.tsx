@@ -1,14 +1,12 @@
 import type { TransferMover } from "@/lib/types";
 import { compactNumber, money } from "@/lib/format";
-
-const SHIRT_URL = (code: number) =>
-  `https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_${code}-66.png`;
+import Link from "next/link";
+import { PlayerKit } from "./PlayerKit";
 
 function MoverRow({ m, tone }: { m: TransferMover; tone: "in" | "out" }) {
   return (
-    <div className="flex items-center gap-2.5 px-3 py-2">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={SHIRT_URL(m.teamCode)} alt="" className="h-6 w-6 shrink-0 object-contain" />
+    <Link href={`/players/${m.playerCode}`} className="flex items-center gap-2.5 px-4 py-3 transition-colors hover:bg-surface-0">
+      <PlayerKit code={m.teamCode} goalkeeper={m.position === "GKP"} className="h-8 w-8 shrink-0" />
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-semibold text-fg">{m.player}</div>
         <div className="text-[11px] text-fg-subtle">
@@ -19,10 +17,9 @@ function MoverRow({ m, tone }: { m: TransferMover; tone: "in" | "out" }) {
         className="shrink-0 text-xs font-extrabold tabular-nums"
         style={{ color: tone === "in" ? "var(--good)" : "var(--critical)" }}
       >
-        {tone === "in" ? "+" : "-"}
-        {compactNumber(tone === "in" ? m.transfersIn : m.transfersOut)}
+        {m.net > 0 ? "+" : "−"}{compactNumber(Math.abs(m.net))}
       </span>
-    </div>
+    </Link>
   );
 }
 
@@ -39,7 +36,7 @@ export function MoversWidget({
       <div className="card card-hover overflow-hidden">
         <div className="flex items-center gap-1.5 border-b border-border px-3 py-2">
           <span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--good)" }} />
-          <span className="section-label">Most transferred in</span>
+          <span className="section-label">Gaining managers · net transfers</span>
         </div>
         <div className="divide-y divide-border">
           {risers.map((m) => (
@@ -50,7 +47,7 @@ export function MoversWidget({
       <div className="card card-hover overflow-hidden">
         <div className="flex items-center gap-1.5 border-b border-border px-3 py-2">
           <span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--critical)" }} />
-          <span className="section-label">Most transferred out</span>
+          <span className="section-label">Losing managers · net transfers</span>
         </div>
         <div className="divide-y divide-border">
           {fallers.map((m) => (

@@ -1,11 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import type { TopScorer } from "@/lib/types";
 import { DataTable, type Column } from "./ui/DataTable";
-
-const SHIRT_URL = (code: number) =>
-  `https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_${code}-66.png`;
+import { PlayerKit } from "./PlayerKit";
 
 export function TopScorersTable({
   rows,
@@ -16,12 +15,15 @@ export function TopScorersTable({
 }) {
   const router = useRouter();
   const owned = new Set(squadCodes);
+  const seasonRank = new Map([...rows].sort((a, b) => b.points - a.points).map((row, index) => [row.playerCode, index + 1]));
+  const [scope, setScope] = useState<"all" | "owned" | "outside">("all");
+  const filtered = rows.filter((row) => scope === "all" || (scope === "owned" ? owned.has(row.playerCode) : !owned.has(row.playerCode)));
 
   const columns: Column<TopScorer>[] = [
     {
       key: "rank",
       header: "#",
-      render: (_r, i) => <span className="text-fg-subtle">{i + 1}</span>,
+      render: (row) => <span className="text-fg-subtle">{seasonRank.get(row.playerCode)}</span>,
     },
     {
       key: "player",
@@ -29,8 +31,7 @@ export function TopScorersTable({
       sortValue: (r) => r.player,
       render: (r) => (
         <span className="flex items-center gap-2">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={SHIRT_URL(r.teamCode)} alt="" className="h-5 w-5 shrink-0 object-contain" />
+          <PlayerKit code={r.teamCode} className="h-7 w-7 shrink-0" />
           <span className="font-semibold text-fg">{r.player}</span>
           <span className="text-xs text-fg-subtle">{r.team}</span>
           {owned.has(r.playerCode) && (
@@ -65,12 +66,19 @@ export function TopScorersTable({
   ];
 
   return (
+    <div>
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="analytics-period" role="group" aria-label="Top scorers scope">{([{ value: "all", label: "All top scorers" }, { value: "owned", label: "In my squad" }, { value: "outside", label: "Outside my squad" }] as const).map((option) => <button key={option.value} aria-pressed={scope === option.value} onClick={() => setScope(option.value)}>{option.label}</button>)}</div>
+      <span className="text-[10px] text-fg-muted">{filtered.length} of the season’s top {rows.length}</span>
+    </div>
     <DataTable
-      data={rows}
+      data={filtered}
       columns={columns}
       rowKey={(r) => r.playerCode}
       initialSort={{ key: "points", dir: "desc" }}
       onRowClick={(r) => router.push(`/players/${r.playerCode}`)}
+      emptyLabel="No players in the season’s leading scorers match this view."
     />
+    </div>
   );
 }
