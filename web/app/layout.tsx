@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Geist_Mono } from "next/font/google";
 import { Nav } from "@/components/Nav";
+import { Sidebar } from "@/components/Sidebar";
 import { BottomNav } from "@/components/BottomNav";
 import { GameweekStrip } from "@/components/GameweekStrip";
 import { CommandPalette, type CommandItem } from "@/components/ui/CommandPalette";
@@ -89,11 +90,14 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       <head>
         <script dangerouslySetInnerHTML={{ __html: NO_FLASH }} />
       </head>
-      <body className="flex min-h-full flex-col overflow-x-hidden">
-        <Nav />
-        {strip && <GameweekStrip {...strip} />}
-        <div className="flex-1 overflow-x-clip pb-20 md:pb-0">
-          <PageTransition>{children}</PageTransition>
+      <body className="flex min-h-full overflow-x-hidden">
+        <Sidebar />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <Nav />
+          {strip && <GameweekStrip {...strip} />}
+          <div className="flex-1 overflow-x-clip pb-20 md:pb-0">
+            <PageTransition>{children}</PageTransition>
+          </div>
         </div>
         <BottomNav />
         <CommandPalette items={commandItems} />
