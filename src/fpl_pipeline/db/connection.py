@@ -6,7 +6,9 @@ from fpl_pipeline.config import DATABASE_URL
 
 
 def get_connection() -> psycopg.Connection:
-    return psycopg.connect(DATABASE_URL)
+    if not DATABASE_URL:
+        raise ValueError("Set DATABASE_URL (or SUPABASE_DATABASE_URL) before using the warehouse.")
+    return psycopg.connect(DATABASE_URL, connect_timeout=15)
 
 
 def init_schema() -> None:

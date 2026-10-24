@@ -172,37 +172,52 @@ suggestions — see below), and `/leagues` (your classic/H2H league standings).
 
 ## AI advisor
 
-Builds a prompt from your current squad, each player's last-5-gameweek form,
-next-3 fixture difficulty, your budget, and in-form alternatives at each
-position (all pulled from Postgres):
+The advisor keeps the manual copy-paste workflow. It makes no LLM API calls,
+requires no API key, and has no website generation button. Run ingestion first
+so player prices, availability and fixtures are recent.
 
-```
-python -m fpl_pipeline.advisor
-```
-
-This prints a prompt for you to paste into a free chat at claude.ai — no
-API costs, ever. The advisor accounts for how many free transfers you
-currently have banked (computed from your transfer history — free
-transfers roll over, capped at 5) and asks for:
-
-- Up to 3 ranked free-transfer ideas (best one first — the rest are backups
-  in case a price rises or a player's status changes before the deadline)
-- A separate call on whether *any* transfer is worth paying a 4-point hit
-  for, populated only when the expected gain clearly outweighs the cost
-- A captain and vice-captain pick, with reasoning
-
-### Transfers page (`web/transfers`)
-
-The prompt also asks claude.ai to end its reply with a machine-readable
-` ```json ` block. Save that reply to a file and run:
-
-```
-python -m fpl_pipeline.advisor --apply <file>
+```sh
+python -m fpl_pipeline.advisor > prompt.txt
 ```
 
-which parses the JSON block and writes it to the `advisor_suggestions`
-table, which the frontend's Transfers tab reads and renders. This is a
-manual, on-demand step — nothing calls the Claude API, so it costs
-nothing and there's no extra repo secret to configure. Re-run it whenever
-you want an updated suggestion (typically once a gameweek, after your
-squad's picked up its latest results).
+Without a confirmed current snapshot this produces **research only** using the
+last locked squad. Public historical picks cannot reveal transfers made since
+that deadline, today's bank, or real selling prices. The advisor leaves those
+values unknown rather than claiming they are current.
+
+For precise transfer checks, prepare a local `current-state.json` using your
+current My Team/Transfers information. It must contain the season, entry ID,
+upcoming gameweek, a timezone-aware `captured_at` timestamp within 24 hours,
+all 15 picks (FPL player IDs, lineup positions 1-15, actual selling prices),
+and `transfers.bank`, `transfers.limit`, `transfers.made`. Money is in tenths
+of a million: 52 means GBP 5.2m. `limit` is the allocation **before** this week's
+moves, not the number remaining; e.g. limit 2 and made 2 leaves zero free
+transfers. See [the snapshot format and audit](docs/advisor-audit.md).
+
+```sh
+python -m fpl_pipeline.advisor --state current-state.json > prompt.txt
+```
+
+Paste `prompt.txt` into your preferred chat and save the reply as `reply.txt`.
+Validate it against the same current snapshot before saving:
+
+```sh
+python -m fpl_pipeline.advisor --state current-state.json --apply reply.txt --check
+python -m fpl_pipeline.advisor --state current-state.json --apply reply.txt
+```
+
+`--check` never writes. `--apply` validates the reply's context fingerprint,
+remaining transfers, position, ownership, club limit, real selling value,
+bank and captain eligibility before writing `advisor_suggestions`. It saves
+advice only; it never executes FPL transfers. If your squad, prices or fixtures
+change, generate a fresh prompt. A stale response is rejected.
+
+The suggestions are up to three independent single-transfer alternatives,
+not a combined transfer plan. Scores rank recent form and fixtures; they are
+not expected points. Points-hit suggestions are disabled until a calibrated
+forecast can substantiate them. Chip recommendations require confirmed
+availability and remain planning signals for you to review.
+
+The website displays saved advice and warns about legacy or expired snapshots.
+It cannot detect moves you make after the supplied snapshot. Current-state
+files, prompts and replies are ignored by Git; no extra service key is needed.
