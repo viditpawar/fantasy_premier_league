@@ -16,7 +16,7 @@ export function RankChart({
 }: {
   data: { gameweek: number; overallRank: number | null }[];
 }) {
-  const points = data.filter((d) => d.overallRank != null) as {
+  const points = data.filter((d) => d.overallRank != null && d.overallRank > 0) as {
     gameweek: number;
     overallRank: number;
   }[];

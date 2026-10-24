@@ -327,8 +327,8 @@ export async function getTransferMomentum(
     })
     .filter((m): m is TransferMover => m != null);
 
-  const risers = [...movers].sort((a, b) => b.net - a.net).slice(0, limit);
-  const fallers = [...movers].sort((a, b) => a.net - b.net).slice(0, limit);
+  const risers = movers.filter((m) => m.net > 0).sort((a, b) => b.net - a.net).slice(0, limit);
+  const fallers = movers.filter((m) => m.net < 0).sort((a, b) => a.net - b.net).slice(0, limit);
   return { risers, fallers };
 }
 
@@ -678,15 +678,17 @@ export async function getManagerAnalytics(
       .eq("team_id", teamId)
       .eq("season", season)
       .order("gameweek", { ascending: true }),
-    sb.from("gameweeks").select("id, average_entry_score").eq("season", season),
+    sb.from("gameweeks").select("id, average_entry_score, finished").eq("season", season),
   ]);
   if (error) throw error;
   const avgByGw = new Map((gws ?? []).map((g) => [g.id, g.average_entry_score as number | null]));
+  const finishedByGw = new Map((gws ?? []).map((g) => [g.id, g.finished as boolean | null]));
 
   const rows: ManagerGameweekRow[] = (hist ?? []).map((h) => {
     const avg = avgByGw.get(h.gameweek) ?? null;
     return {
       gameweek: h.gameweek,
+      finished: finishedByGw.get(h.gameweek) ?? null,
       points: h.points ?? 0,
       totalPoints: h.total_points ?? 0,
       overallRank: h.overall_rank ?? null,

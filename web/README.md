@@ -36,8 +36,14 @@ The match centre reloads the warehouse snapshot every minute. Underlying scores 
 
 The shared shell and overview resolve the same manager and season through `lib/workspace.ts`. Design tokens and responsive layouts live in `app/globals.css`. Club-colour kit illustrations render locally as SVG. Deadline and generated-time labels use America/Phoenix (MST).
 
+Analytics defaults to confirmed finished gameweeks, so a pending zero does not lower season averages. Full-season, last-five and last-ten views update the summary, points/rank/advantage charts, squad value, consistency and sortable gameweek journal together. Unfinished weeks can be included explicitly and are marked provisional. CSV export includes the selected gameweeks, completion status, reported scores, global averages, overall ranks, bench points and transfer costs. Missing averages are excluded from comparison denominators, and transfer costs remain separate from reported scores.
+
+The player insights below the analytics workspace use the full season and latest transfer snapshot independently of the selected period. Leading scorers can be filtered by current squad ownership. Transfer momentum displays the same net-transfer metric used for its ranking.
+
 ## Validate and deploy
 
 `npx tsc --noEmit` checks types. `npm run build` produces the production app; `npm run start` serves it locally. No additional dependencies were introduced by the redesign.
+
+`npm test` checks the analytics calculations, including completion filtering, missing averages and ranks, period baselines, transfer costs, valuation snapshots and CSV output. The tests use Node’s built-in test runner and the existing TypeScript compiler.
 
 For the existing Vercel deployment, keep the project root set to `web` and retain `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. The existing Python pipeline and database schema do not need to change for this interface.

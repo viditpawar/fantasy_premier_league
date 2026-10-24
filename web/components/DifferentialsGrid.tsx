@@ -3,9 +3,7 @@
 import { useRouter } from "next/navigation";
 import type { PlayerSeasonRow } from "@/lib/types";
 import { money, positionColor } from "@/lib/format";
-
-const SHIRT_URL = (code: number) =>
-  `https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_${code}-66.png`;
+import { PlayerKit } from "./PlayerKit";
 
 export function DifferentialsGrid({ players }: { players: PlayerSeasonRow[] }) {
   const router = useRouter();
@@ -24,8 +22,7 @@ export function DifferentialsGrid({ players }: { players: PlayerSeasonRow[] }) {
             style={{ background: positionColor(p.position) }}
           />
           <div className="mb-1.5 flex items-center justify-between">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={SHIRT_URL(p.teamCode)} alt="" className="h-7 w-7 object-contain" />
+            <PlayerKit code={p.teamCode} goalkeeper={p.position === "GKP"} className="h-9 w-9" />
             <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] font-bold text-fg-muted">
               {p.ownership != null ? `${p.ownership.toFixed(1)}%` : "—"}
             </span>
@@ -38,6 +35,8 @@ export function DifferentialsGrid({ players }: { players: PlayerSeasonRow[] }) {
             <span className="text-lg font-extrabold tabular-nums text-fg">{p.totalPoints}</span>
             <span className="text-[10px] text-fg-subtle">pts</span>
           </div>
+          {p.inSquad && <span className="mt-2 block text-[9px] text-accent">In your squad</span>}
+          {p.status !== "a" && <span className="mt-2 block text-[9px] text-warning">Check availability</span>}
         </button>
       ))}
     </div>
