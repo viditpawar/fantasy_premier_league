@@ -1,103 +1,15 @@
 "use client";
-
 import type { PlayerSeasonRow } from "@/lib/types";
 import { Sparkline } from "./ui/Sparkline";
+import { PlayerKit } from "./PlayerKit";
 import { money, positionColor } from "@/lib/format";
 
-const SHIRT_URL = (code: number) =>
-  `https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_${code}-66.png`;
-
-const STATUS_DOT: Record<string, string> = {
-  a: "var(--good)",
-  d: "var(--warning)",
-  i: "var(--critical)",
-  s: "var(--critical)",
-  u: "var(--fg-subtle)",
-  n: "var(--fg-subtle)",
-};
-
-export function PlayerTile({
-  player: p,
-  selected,
-  onToggleSelect,
-  onOpen,
-}: {
-  player: PlayerSeasonRow;
-  selected: boolean;
-  onToggleSelect: () => void;
-  onOpen: () => void;
-}) {
-  const accent = positionColor(p.position);
-  return (
-    <div
-      className={`card card-hover relative cursor-pointer overflow-hidden px-3.5 py-3.5 transition-shadow ${
-        selected ? "ring-2 ring-accent" : ""
-      }`}
-      onClick={onOpen}
-    >
-      <div
-        className="pointer-events-none absolute inset-0 opacity-[0.08]"
-        style={{ background: `radial-gradient(90% 90% at 100% 0%, ${accent}, transparent 60%)` }}
-      />
-      <div className="relative flex items-start justify-between">
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleSelect();
-          }}
-          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors ${
-            selected ? "border-accent bg-accent text-white" : "border-border-strong text-transparent hover:border-accent"
-          }`}
-          aria-label={selected ? `Remove ${p.player} from compare` : `Add ${p.player} to compare`}
-        >
-          <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={3}>
-            <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
-        <span
-          className="rounded-full px-1.5 py-0.5 text-[10px] font-bold text-white"
-          style={{ background: accent }}
-        >
-          {p.position}
-        </span>
-      </div>
-
-      <div className="relative -mt-1 mb-1 flex items-center justify-center">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={SHIRT_URL(p.teamCode)} alt="" className="h-14 w-14 object-contain drop-shadow-md" />
-        <span
-          className="absolute bottom-0 right-1/2 h-2 w-2 translate-x-6 rounded-full ring-2 ring-surface-1"
-          style={{ background: STATUS_DOT[p.status] ?? "var(--fg-subtle)" }}
-        />
-      </div>
-
-      <div className="relative text-center">
-        <div className="flex items-center justify-center gap-1">
-          <span className="truncate text-sm font-bold text-fg">{p.player}</span>
-          {p.inSquad && (
-            <span className="shrink-0 rounded bg-accent/15 px-1 py-0.5 text-[9px] font-extrabold text-accent">
-              OWN
-            </span>
-          )}
-        </div>
-        <div className="text-[11px] text-fg-subtle">
-          {p.team} · {money(p.nowCost)}
-        </div>
-      </div>
-
-      <div className="relative mt-2.5 flex items-center justify-between border-t border-border pt-2">
-        <div className="flex items-baseline gap-1">
-          <span className="text-lg font-extrabold tabular-nums text-fg">{p.totalPoints}</span>
-          <span className="text-[10px] text-fg-subtle">pts</span>
-        </div>
-        {p.formSeries.length > 1 && (
-          <Sparkline data={p.formSeries} width={40} height={16} stroke={accent} />
-        )}
-        <span className="text-[11px] font-semibold text-fg-muted">
-          {p.ownership != null ? `${p.ownership.toFixed(1)}%` : "—"}
-        </span>
-      </div>
-
-    </div>
-  );
+export function PlayerTile({ player, selected, onToggleSelect, onOpen }: { player: PlayerSeasonRow; selected: boolean; onToggleSelect: () => void; onOpen: () => void }) {
+  const accent = positionColor(player.position);
+  return <article className={`card card-hover relative overflow-hidden p-5 ${selected ? "ring-2 ring-accent" : ""}`}>
+    <div className="flex items-center justify-between"><button onClick={onToggleSelect} aria-pressed={selected} aria-label={`${selected ? "Remove" : "Add"} ${player.player} ${selected ? "from" : "to"} compare`} className={`grid h-6 w-6 place-items-center rounded-lg border ${selected ? "border-accent bg-accent text-accent-contrast" : "border-border-strong text-transparent hover:border-accent"}`}><svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m5 12 4 4 10-10" /></svg></button><span className="rounded-md px-2 py-1 text-[9px] font-medium" style={{ background: `color-mix(in srgb, ${accent} 10%, transparent)`, color: accent }}>{player.position}</span></div>
+    <button onClick={onOpen} aria-label={`Open ${player.player}'s profile`} className="mt-2 block w-full text-center"><PlayerKit code={player.teamCode} goalkeeper={player.position === "GKP"} className="mx-auto mb-3 h-16 w-16" /><strong className="block truncate text-[13px] font-medium">{player.player}</strong><span className="mt-1 block text-[10px] text-fg-muted">{player.team} · {money(player.nowCost)}</span></button>
+    <div className="mt-4 flex items-end justify-between border-t border-border pt-3"><div><strong className="text-xl font-medium tracking-tight">{player.totalPoints}</strong><span className="ml-1 text-[9px] text-fg-muted">pts</span></div>{player.formSeries.length > 1 && <Sparkline data={player.formSeries} width={42} height={19} stroke="var(--accent)" />}<span className="text-[10px] text-fg-muted">{player.ownership != null ? `${player.ownership.toFixed(1)}%` : "—"}</span></div>
+    <div className="mt-3 flex justify-between text-[8px]"><span className={player.status === "a" ? "text-good" : "text-warning"}>{player.status === "a" ? "Available" : "Check availability"}</span>{player.inSquad && <span className="text-accent">In your squad</span>}</div>
+  </article>;
 }

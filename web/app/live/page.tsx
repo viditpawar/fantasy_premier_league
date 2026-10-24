@@ -1,198 +1,35 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getSupabase } from "@/lib/supabase";
-import {
-  getCurrentSeason,
-  getGameweekMeta,
-  getLeagueRivals,
-  getLiveGameweek,
-  getManagerLeagues,
-  getTeamId,
-} from "@/lib/queries";
-import { SectionHeader } from "@/components/ui/SectionHeader";
+import { getWorkspace } from "@/lib/workspace";
+import { getGameweekMeta, getLeagueRivals, getLiveGameweek, getManagerLeagues } from "@/lib/queries";
+import type { LivePlayer } from "@/lib/types";
 import { Hero } from "@/components/ui/Hero";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { AutoRefresh } from "@/components/AutoRefresh";
-import { IconBolt } from "@/components/icons";
+import { PlayerKit } from "@/components/PlayerKit";
+import { IconArrowRight, IconBolt, IconClock, IconTrophy } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Live" };
-
-const SHIRT_URL = (code: number) =>
-  `https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_${code}-66.png`;
-
+export const metadata: Metadata = { title: "Match centre" };
+function ScoreRows({ players, bench = false }: { players: LivePlayer[]; bench?: boolean }) {
+  return <div>{players.map((player) => <div key={player.playerCode} className="flex items-center gap-3 border-t border-border px-5 py-3.5"><PlayerKit code={player.teamCode} goalkeeper={player.position === "GKP"} className="h-9 w-9 shrink-0" /><span className="hidden w-7 text-[9px] text-fg-subtle sm:block">{player.position}</span><div className="min-w-0 flex-1"><Link href={`/players/${player.playerCode}`} className="block truncate text-[12px] font-medium hover:text-accent">{player.player}{player.isCaptain && <span className="ml-2 rounded bg-accent/10 px-1.5 py-0.5 text-[8px] text-accent">C</span>}{player.isViceCaptain && <span className="ml-2 text-[9px] text-fg-subtle">VC</span>}</Link><span className="text-[9px] text-fg-subtle">{player.team}</span></div><span className="flex shrink-0 items-center gap-1.5 text-[9px] text-fg-muted"><span className={`h-1 w-1 rounded-full ${player.hasFixture && !player.fixtureFinished && player.minutes > 0 ? "bg-good" : "bg-fg-subtle"}`} />{!player.hasFixture ? "No fixture" : player.fixtureFinished ? "Full time" : player.minutes > 0 ? `${player.minutes}′` : "To play"}</span><strong className="ml-3 w-8 text-right text-lg font-medium tracking-tight">{bench ? player.livePoints : player.livePoints * player.multiplier}</strong></div>)}</div>;
+}
 export default async function LivePage() {
-  const sb = getSupabase();
-  const season = await getCurrentSeason(sb);
-  const teamId = await getTeamId(sb);
-
-  const [live, { current }, leagues] = await Promise.all([
-    getLiveGameweek(sb, teamId, season),
-    getGameweekMeta(sb, season),
-    getManagerLeagues(sb, teamId, season),
-  ]);
-
-  if (!live) {
-    return (
-      <main className="animate-fade-in mx-auto w-full max-w-3xl px-4 py-6">
-        <Hero icon={<IconBolt className="h-4 w-4" />} title="Live gameweek" />
-        <EmptyState title="No live gameweek data yet">
-          This fills in once the current gameweek&apos;s picks and player scores have been ingested.
-        </EmptyState>
-      </main>
-    );
-  }
-
-  const classic =
-    leagues.find((l) => l.leagueType === "classic" && /entrada/i.test(l.leagueName)) ??
-    leagues.find((l) => l.leagueType === "classic");
-  const rivals = classic
-    ? await getLeagueRivals(sb, classic.leagueId, season, teamId, classic.leagueName).catch(() => null)
-    : null;
-
-  const starting = live.players
-    .filter((p) => p.squadPosition <= 11)
-    .sort((a, b) => a.squadPosition - b.squadPosition);
-  const bench = live.players
-    .filter((p) => p.squadPosition > 11)
-    .sort((a, b) => a.squadPosition - b.squadPosition);
-
-  const vsAvg =
-    live.averageEntryScore != null ? live.liveTotal - live.averageEntryScore : null;
-
-  return (
-    <main className="animate-fade-in mx-auto w-full max-w-3xl px-4 py-6">
-      <Hero
-        icon={
-          <span className="relative flex h-full w-full items-center justify-center">
-            <IconBolt className="h-4 w-4" />
-            {!current?.finished && (
-              <span className="absolute -right-0.5 -top-0.5 h-2 w-2 animate-pulse rounded-full bg-[var(--critical)] ring-2 ring-surface-1" />
-            )}
-          </span>
-        }
-        eyebrow={current?.finished ? "Gameweek finished" : "Live · updates with the pipeline ingest"}
-        title={`GW${live.gameweek} live`}
-        action={<AutoRefresh seconds={60} />}
-        stats={[
-          { label: "Live points", value: live.liveTotal, accent: true },
-          { label: "On the bench", value: live.benchPoints },
-          { label: "Yet to play", value: live.playersYetToPlay, accent: false },
-          {
-            label: "vs average",
-            value: vsAvg != null ? `${vsAvg > 0 ? "+" : ""}${vsAvg}` : "—",
-          },
-        ]}
-      />
-
-      <section className="mb-6">
-        <SectionHeader title="Starting XI" hint={`captain: ${live.captain ?? "—"}`} />
-        <div className="card divide-y divide-border overflow-hidden">
-          {starting.map((p) => (
-            <div key={p.playerCode} className="flex items-center gap-3 px-3 py-2 text-sm">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={SHIRT_URL(p.teamCode)} alt="" className="h-6 w-6 shrink-0 object-contain" />
-              <span className="w-9 shrink-0 text-xs font-bold text-fg-subtle">{p.position}</span>
-              <span className="flex-1 truncate font-semibold text-fg">
-                {p.player}
-                {p.isCaptain && <span className="ml-1 text-accent">(C)</span>}
-                {p.isViceCaptain && <span className="ml-1 text-fg-subtle">(V)</span>}
-              </span>
-              <span className="flex w-16 shrink-0 items-center justify-end gap-1.5 text-right text-xs text-fg-subtle">
-                <span
-                  className="h-1.5 w-1.5 shrink-0 rounded-full"
-                  style={{
-                    background:
-                      p.hasFixture && !p.fixtureFinished && p.minutes > 0
-                        ? "var(--good)"
-                        : p.hasFixture && !p.fixtureFinished
-                          ? "var(--warning)"
-                          : "var(--fg-subtle)",
-                  }}
-                />
-                {!p.hasFixture
-                  ? "no game"
-                  : p.fixtureFinished
-                    ? "FT"
-                    : p.minutes > 0
-                      ? `${p.minutes}'`
-                      : "—"}
-              </span>
-              <span className="w-12 shrink-0 text-right font-extrabold tabular-nums text-fg">
-                {p.livePoints * (p.multiplier || 1)}
-              </span>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="mb-6">
-        <SectionHeader title="Bench" />
-        <div className="card divide-y divide-border overflow-hidden">
-          {bench.map((p) => (
-            <div key={p.playerCode} className="flex items-center gap-3 px-3 py-2 text-sm text-fg-muted">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={SHIRT_URL(p.teamCode)} alt="" className="h-6 w-6 shrink-0 object-contain opacity-70" />
-              <span className="w-9 shrink-0 text-xs font-bold text-fg-subtle">{p.position}</span>
-              <span className="flex-1 truncate">{p.player}</span>
-              <span className="w-12 shrink-0 text-right font-bold tabular-nums">{p.livePoints}</span>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {rivals && rivals.nearby.length > 0 && (
-        <section>
-          <SectionHeader
-            title={`${rivals.leagueName} — around you`}
-            action={
-              <Link href={`/leagues/${rivals.leagueId}`} className="text-xs font-semibold text-accent">
-                Full table →
-              </Link>
-            }
-          />
-          <div className="card divide-y divide-border overflow-hidden">
-            {rivals.nearby.map((r) => (
-              <div
-                key={r.entryTeamId}
-                className={`flex items-center gap-3 px-3 py-2 text-sm ${
-                  r.isMe ? "bg-[color-mix(in_oklab,var(--accent)_10%,transparent)]" : ""
-                }`}
-              >
-                <span className="w-8 shrink-0 font-extrabold tabular-nums text-fg-subtle">{r.rank}</span>
-                <span className="flex-1 truncate">
-                  <span className={`font-semibold ${r.isMe ? "text-accent" : "text-fg"}`}>
-                    {r.entryName}
-                  </span>
-                  <span className="ml-1.5 text-xs text-fg-subtle">{r.playerName}</span>
-                </span>
-                <span className="w-12 shrink-0 text-right text-xs text-fg-subtle">
-                  {r.eventTotal != null ? `GW ${r.eventTotal}` : ""}
-                </span>
-                <span className="w-14 shrink-0 text-right font-extrabold tabular-nums text-fg">
-                  {r.total}
-                </span>
-              </div>
-            ))}
-          </div>
-          {rivals.me && (
-            <p className="mt-2 text-center text-[11px] text-fg-subtle">
-              {rivals.gapToFirst != null && rivals.gapToFirst > 0 && (
-                <>{rivals.gapToFirst} pts behind 1st</>
-              )}
-              {rivals.gapToNextRank != null && rivals.gapToNextRank > 0 && (
-                <> · {rivals.gapToNextRank} pts to the place above</>
-              )}
-            </p>
-          )}
-        </section>
-      )}
-
-      <p className="mt-6 text-center text-[11px] text-fg-subtle">
-        {current?.finished
-          ? "This gameweek is finished — scores are final."
-          : "Live scores update with the pipeline ingest (about every 2 hours), not in real time."}
-      </p>
-    </main>
-  );
+  const { sb, season, teamId } = await getWorkspace();
+  const [live, { current }, leagues] = await Promise.all([getLiveGameweek(sb, teamId, season), getGameweekMeta(sb, season), getManagerLeagues(sb, teamId, season)]);
+  if (!live) return <main className="page-container animate-fade-in"><Hero title="The matchday picture." eyebrow="Match centre" icon={<IconBolt />} /><EmptyState title="Waiting for the first whistle.">Your matchday view will appear when gameweek selections and scores are available.</EmptyState></main>;
+  const classic = leagues.find((league) => league.leagueType === "classic" && /entrada/i.test(league.leagueName)) ?? leagues.find((league) => league.leagueType === "classic");
+  const rivals = classic ? await getLeagueRivals(sb, classic.leagueId, season, teamId, classic.leagueName).catch(() => null) : null;
+  const starting = live.players.filter((player) => player.squadPosition <= 11).sort((a, b) => a.squadPosition - b.squadPosition);
+  const bench = live.players.filter((player) => player.squadPosition > 11).sort((a, b) => a.squadPosition - b.squadPosition);
+  const captain = starting.find((player) => player.isCaptain);
+  const finished = current?.id === live.gameweek ? current.finished : live.finished;
+  return <main className="page-container animate-fade-in"><Hero title="The matchday picture." eyebrow={`Gameweek ${live.gameweek} · ${finished ? "Final scores" : "Latest snapshot"}`} icon={<IconBolt />} subtitle="Follow every contribution. See the points behind your gameweek." action={<AutoRefresh seconds={60} />} stats={[{ label: "Gameweek points", value: live.liveTotal, accent: true }, { label: "Gameweek average", value: live.averageEntryScore ?? "—" }, { label: "Yet to play", value: live.playersYetToPlay }, { label: "Bench points", value: live.benchPoints }]} />
+    <div className="mb-6 flex items-center gap-2 rounded-xl border border-border bg-surface-1 px-4 py-3 text-[10px] leading-5 text-fg-muted"><IconClock className="h-3.5 w-3.5 shrink-0" />{finished ? "This gameweek is finished. These are the scores in your latest saved snapshot." : "Scores follow your warehouse updates, approximately every two hours. This page reloads the saved snapshot every minute."}</div>
+    <div className="overview-grid"><div className="flex min-w-0 flex-col gap-6"><section className="card overflow-hidden"><div className="panel-heading !pb-5"><div><h2>On the pitch</h2><p className="panel-subtitle">Your starting eleven · Captain multiplier included</p></div><span className="text-[9px] text-fg-subtle">Points</span></div><ScoreRows players={starting} /></section><section className="card overflow-hidden"><div className="panel-heading !pb-5"><div><h2>Ready on the bench</h2><p className="panel-subtitle">In substitution order</p></div></div><ScoreRows players={bench} bench /></section></div>
+      <aside className="flex min-w-0 flex-col gap-6">{captain && <section className="card insight-card"><div className="insight-eyebrow"><span className="insight-icon"><IconBolt /></span>Wearing the armband</div><div className="mt-5 flex items-center gap-4"><PlayerKit code={captain.teamCode} className="h-16 w-16" /><div><h2 className="!mt-0">{captain.player}</h2><p className="mt-2 text-[11px] text-fg-muted">{captain.livePoints} × {captain.multiplier} = <span className="font-semibold text-accent">{captain.livePoints * captain.multiplier} points</span></p></div></div><Link href={`/players/${captain.playerCode}`} className="text-link mt-5">View player profile<IconArrowRight /></Link></section>}
+      {rivals && rivals.nearby.length > 0 && <section className="card overflow-hidden"><div className="panel-heading"><div><h2>How the rivals are doing</h2><p className="panel-subtitle">{rivals.leagueName}</p></div><IconTrophy className="h-4 w-4 text-fg-subtle" /></div><div className="mt-4">{rivals.nearby.map((rival) => <div key={rival.entryTeamId} className={`flex items-center gap-3 border-t border-border px-5 py-4 ${rival.isMe ? "bg-accent/5" : ""}`}><span className="w-5 text-[11px] text-fg-subtle">{rival.rank}</span><div className="min-w-0 flex-1"><strong className={`block truncate text-[11px] font-medium ${rival.isMe ? "text-accent" : ""}`}>{rival.entryName}{rival.isMe ? " · You" : ""}</strong><span className="text-[9px] text-fg-muted">{rival.playerName}</span></div><span className="text-[12px] font-medium">{rival.total}</span></div>)}</div><Link href={`/leagues/${rivals.leagueId}`} className="text-link m-5">Full standings<IconArrowRight /></Link></section>}
+      </aside>
+    </div>
+  </main>;
 }

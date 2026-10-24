@@ -8,21 +8,18 @@ export function AutoRefresh({ seconds = 60 }: { seconds?: number }) {
   const [left, setLeft] = useState(seconds);
 
   useEffect(() => {
+    let remaining = seconds;
     const tick = setInterval(() => {
-      setLeft((l) => {
-        if (l <= 1) {
-          router.refresh();
-          return seconds;
-        }
-        return l - 1;
-      });
+      remaining -= 1;
+      if (remaining <= 0) { router.refresh(); remaining = seconds; }
+      setLeft(remaining);
     }, 1000);
     return () => clearInterval(tick);
   }, [router, seconds]);
 
   return (
     <span className="text-[11px] text-fg-subtle" suppressHydrationWarning>
-      auto-refresh in {left}s
+      Snapshot refresh in {left}s
     </span>
   );
 }

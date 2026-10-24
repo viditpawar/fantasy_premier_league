@@ -1,0 +1,6 @@
+"use client";
+import { useTheme } from "./ui/ThemeToggle";
+export function AppearanceSettings() {
+  const { theme, setTheme } = useTheme();
+  return <div className="mt-5 grid grid-cols-2 gap-4" aria-label="Appearance">{(["light", "dark"] as const).map((option) => <button key={option} aria-pressed={theme === option} onClick={() => setTheme(option)} className={`rounded-xl border p-3 text-left transition-colors ${theme === option ? "border-accent bg-accent/5" : "border-border"}`}><span className={`flex h-24 gap-2 overflow-hidden rounded-lg border p-2 ${option === "light" ? "border-[#e5e9eb] bg-[#f7f8fa]" : "border-[#354344] bg-[#131b1c]"}`} aria-hidden="true"><span className={`w-7 rounded-md ${option === "light" ? "bg-white" : "bg-[#263333]"}`} /><span className="flex flex-1 flex-col gap-2"><span className={`h-4 rounded ${option === "light" ? "bg-[#e3ebe6]" : "bg-[#426453]"}`} /><span className="grid flex-1 grid-cols-2 gap-2"><span className={`rounded ${option === "light" ? "bg-white" : "bg-[#263333]"}`} /><span className={`rounded ${option === "light" ? "bg-white" : "bg-[#263333]"}`} /></span></span></span><span className="mt-3 flex items-center justify-between text-xs capitalize">{option}<span className={`h-3 w-3 rounded-full border ${theme === option ? "border-accent bg-accent" : "border-border-strong"}`} /></span></button>)}</div>;
+}

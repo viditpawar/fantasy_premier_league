@@ -37,22 +37,18 @@ export function StatTile({
   hint,
 }: StatTileProps) {
   return (
-    <div className="card card-hover relative min-w-0 overflow-hidden px-4 py-3.5">
-      <div
-        className="absolute inset-x-0 top-0 h-[3px]"
-        style={{ background: `linear-gradient(90deg, ${accent}, transparent 150%)` }}
-      />
+    <div className="card relative min-w-0 overflow-hidden px-5 py-5">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="truncate text-xl font-extrabold tracking-tight text-fg sm:text-2xl">
+          <div className="mb-2 truncate text-[10px] font-medium text-fg-muted">{label}</div>
+          <div className="truncate text-[27px] font-medium tracking-[-0.05em]" style={{ color: accent }}>
             {typeof value === "number" ? (
               <CountUp value={value} numberStyle={numberStyle} prefix={prefix} suffix={suffix} />
             ) : (
               value
             )}
           </div>
-          <div className="mt-1 section-label truncate">{label}</div>
-          {hint && <div className="mt-0.5 text-[11px] text-fg-subtle">{hint}</div>}
+          {hint && <div className="mt-2 text-[10px] text-fg-muted">{hint}</div>}
         </div>
         {icon && (
           <div

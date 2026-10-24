@@ -81,7 +81,8 @@ export function positionColor(position: Position): string {
 export function kickoffLabel(iso: string | null | undefined): string {
   if (!iso) return "TBC";
   const d = new Date(iso);
-  return d.toLocaleDateString(undefined, {
+  return d.toLocaleDateString(LOCALE, {
+    timeZone: "America/Phoenix",
     weekday: "short",
     day: "numeric",
     month: "short",
@@ -92,7 +93,7 @@ export function kickoffLabel(iso: string | null | undefined): string {
 
 export function shortDate(iso: string | null | undefined): string {
   if (!iso) return "TBC";
-  return new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+  return new Date(iso).toLocaleDateString(LOCALE, { day: "numeric", month: "short", timeZone: "America/Phoenix" });
 }
 
 export interface Countdown {

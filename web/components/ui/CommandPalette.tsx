@@ -63,6 +63,7 @@ function PaletteBody({ items, onClose }: { items: CommandItem[]; onClose: () => 
   const allItems = useMemo<CommandItem[]>(
     () => [
       ...NAV_LINKS.map((l) => ({ id: `page:${l.href}`, label: l.label, href: l.href, group: "Pages" })),
+      { id: "page:settings", label: "Settings & information", href: "/settings", group: "Pages" },
       ...items,
     ],
     [items],
@@ -75,10 +76,25 @@ function PaletteBody({ items, onClose }: { items: CommandItem[]; onClose: () => 
   }, [query, allItems]);
 
   const clampedActive = Math.min(active, Math.max(0, results.length - 1));
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     inputRef.current?.focus();
-  }, []);
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+      if (event.key !== "Tab") return;
+      const focusable = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>('input, button') ?? []);
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("keydown", onKey); document.body.style.overflow = previousOverflow; previousFocus?.focus(); };
+  }, [onClose]);
 
   function choose(item: CommandItem | undefined) {
     if (!item) return;
@@ -90,6 +106,7 @@ function PaletteBody({ items, onClose }: { items: CommandItem[]; onClose: () => 
     <div className="fixed inset-0 z-[60] flex items-start justify-center px-4 pt-[12vh]">
       <motion.div
         className="absolute inset-0 bg-black/50"
+        aria-hidden="true"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -97,6 +114,10 @@ function PaletteBody({ items, onClose }: { items: CommandItem[]; onClose: () => 
         onClick={onClose}
       />
       <motion.div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Search your workspace"
         className="glass relative w-full max-w-lg overflow-hidden rounded-2xl border border-border-strong shadow-[var(--shadow-pop)]"
         initial={{ opacity: 0, y: -8, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -104,6 +125,7 @@ function PaletteBody({ items, onClose }: { items: CommandItem[]; onClose: () => 
         transition={{ duration: 0.16 }}
       >
         <input
+          aria-label="Search pages and players"
           ref={inputRef}
           value={query}
           onChange={(e) => {

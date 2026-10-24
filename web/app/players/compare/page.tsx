@@ -22,7 +22,9 @@ export default async function ComparePage(props: PageProps<"/players/compare">) 
   const codeList = (Array.isArray(codes) ? codes[0] : codes ?? "")
     .split(",")
     .map((c) => Number(c))
-    .filter((c) => Number.isFinite(c));
+    .filter((c) => Number.isInteger(c) && c > 0)
+    .filter((c, index, all) => all.indexOf(c) === index)
+    .slice(0, 4);
 
   const sb = getSupabase();
   const season = await getCurrentSeason(sb);

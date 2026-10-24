@@ -1,54 +1,17 @@
 "use client";
-
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Brand } from "./Brand";
 import { NAV_LINKS, isActive } from "./navLinks";
-import { ThemeToggle } from "./ui/ThemeToggle";
-import { CommandPaletteTrigger } from "./ui/CommandPalette";
-
-export function Sidebar() {
+import { IconArrowRight, IconPitch, IconSettings } from "./icons";
+export function Sidebar({ season, manager, team, live = false }: { season: string; manager: string; team: string; live?: boolean }) {
   const pathname = usePathname();
-
-  return (
-    <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-border md:flex">
-      <div className="glass flex h-full flex-col">
-        <Link href="/" className="flex items-center gap-2.5 px-5 pb-2 pt-5">
-          <span
-            className="inline-block h-7 w-7 shrink-0 rounded-[9px]"
-            style={{ background: "linear-gradient(135deg, var(--brand-purple-bright), var(--accent))" }}
-          />
-          <span className="truncate text-[15px] font-bold tracking-tight text-fg">FPL Cockpit</span>
-        </Link>
-
-        <nav className="mt-3 flex-1 overflow-y-auto px-3 py-1">
-          <div className="section-label px-2.5 pb-1.5">Navigate</div>
-          <ul className="flex flex-col gap-0.5">
-            {NAV_LINKS.map((link) => {
-              const active = isActive(pathname, link.href);
-              const Icon = link.icon;
-              return (
-                <li key={link.href}>
-                  <Link
-                    href={link.href}
-                    className={`flex items-center gap-2.5 rounded-[10px] px-2.5 py-[7px] text-[14px] font-medium transition-colors ${
-                      active ? "text-white" : "text-fg hover:bg-surface-2"
-                    }`}
-                    style={active ? { background: "var(--accent)" } : undefined}
-                  >
-                    <Icon className="h-[18px] w-[18px] shrink-0" />
-                    <span className="truncate">{link.label}</span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
-
-        <div className="flex items-center justify-between gap-2 border-t border-border px-4 py-3">
-          <CommandPaletteTrigger />
-          <ThemeToggle />
-        </div>
-      </div>
-    </aside>
-  );
+  const initials = manager.split(" ").map((s) => s[0]).slice(0, 2).join("");
+  return <aside className="app-sidebar" aria-label="Main navigation">
+    <div className="px-2"><Brand /></div>
+    <nav className="flex-1 overflow-y-auto pb-2">{(["Workspace", "Discover", "Strategy"] as const).map((group) => <div className="nav-group" key={group}><p>{group}</p>{NAV_LINKS.filter((link) => link.group === group).map(({ href, label, icon: Icon }) => <Link href={href} key={href} className="side-link" data-active={isActive(pathname, href)} aria-current={isActive(pathname, href) ? "page" : undefined}><Icon /><span>{label}</span>{href === "/live" && live && <span className="nav-live">LIVE</span>}</Link>)}</div>)}</nav>
+    <div className="season-note"><IconPitch /><strong>One season. Every possibility.</strong><p>{season} season<br />Make your next move count.</p><Link href="/fixtures" className="text-link mt-3">Look ahead <IconArrowRight /></Link></div>
+    <Link href="/settings" className="side-link" data-active={isActive(pathname, "/settings")}><IconSettings />Settings & information</Link>
+    <Link href="/settings" className="sidebar-profile"><span className="avatar">{initials || "FP"}</span><div className="min-w-0 flex-1"><strong className="block truncate text-[11px] font-medium">{manager}</strong><span className="mt-0.5 block truncate text-[9px] text-fg-muted">{team}</span></div><IconArrowRight className="h-3 w-3 text-fg-subtle" /></Link>
+  </aside>;
 }

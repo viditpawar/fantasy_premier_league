@@ -74,7 +74,7 @@ export function TransferCompare({
 
   return (
     <div
-      className="card card-hover px-4 py-3.5"
+      className="card px-5 py-5"
       style={rank === 1 ? { boxShadow: "inset 3px 0 0 var(--accent), var(--shadow-card)" } : undefined}
     >
       <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -91,11 +91,11 @@ export function TransferCompare({
           </span>
         )}
         <Badge tone="brand">{transfer.position}</Badge>
-        <span className="font-semibold text-[var(--critical)] line-through decoration-2">
+        <span className="text-[13px] font-medium text-fg-muted">
           {transfer.player_out}
         </span>
         <span className="text-fg-subtle">→</span>
-        <span className="font-bold text-[var(--good)]">{transfer.player_in}</span>
+        <span className="text-[13px] font-semibold text-accent">{transfer.player_in}</span>
         {hit && (
           <Badge tone="warning" className="ml-auto">
             -4 pts
@@ -128,7 +128,7 @@ export function TransferCompare({
         </div>
       )}
 
-      <p className="text-sm text-fg-muted">{transfer.reasoning}</p>
+      <p className="mt-4 text-[11px] leading-6 text-fg-muted">{transfer.reasoning}</p>
     </div>
   );
 }
