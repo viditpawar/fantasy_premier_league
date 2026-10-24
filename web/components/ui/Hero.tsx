@@ -13,6 +13,7 @@ export function Hero({
   icon,
   stats,
   action,
+  accent = "var(--accent)",
 }: {
   eyebrow?: string;
   title: ReactNode;
@@ -20,37 +21,42 @@ export function Hero({
   icon?: ReactNode;
   stats?: HeroStat[];
   action?: ReactNode;
+  accent?: string;
 }) {
   return (
-    <header className="mesh-hero relative mb-5 px-5 py-6 sm:px-7 sm:py-7">
-      <div className="relative flex flex-wrap items-start justify-between gap-5">
+    <header className="mb-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           {eyebrow && (
-            <div className="mb-1.5 flex items-center gap-2">
+            <div className="mb-1 flex items-center gap-2">
               {icon && (
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-fg backdrop-blur-sm">
+                <span
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[7px] text-white"
+                  style={{ background: accent }}
+                >
                   {icon}
                 </span>
               )}
-              <span className="section-label text-fg-muted">{eyebrow}</span>
+              <span className="section-label">{eyebrow}</span>
             </div>
           )}
-          <h1 className="text-3xl font-extrabold tracking-tight text-fg sm:text-4xl">{title}</h1>
-          {subtitle && <p className="mt-1.5 max-w-md text-sm text-fg-muted">{subtitle}</p>}
+          <h1 className="large-title">{title}</h1>
+          {subtitle && <p className="mt-1.5 max-w-md text-[15px] leading-snug text-fg-muted">{subtitle}</p>}
         </div>
-        {action && <div className="shrink-0">{action}</div>}
+        {action && <div className="shrink-0 pt-1">{action}</div>}
       </div>
 
       {stats && stats.length > 0 && (
-        <div className="relative mt-5 flex flex-wrap gap-x-7 gap-y-3 border-t border-white/10 pt-4">
+        <div className="mt-5 flex flex-wrap gap-x-7 gap-y-3 border-t border-border pt-4">
           {stats.map((s, i) => (
             <div key={i}>
               <div
-                className={`text-xl font-extrabold tabular-nums sm:text-2xl ${s.accent ? "text-gradient" : "text-fg"}`}
+                className="text-[22px] font-bold tabular-nums leading-none sm:text-2xl"
+                style={{ color: s.accent ? accent : "var(--fg)" }}
               >
                 {s.value}
               </div>
-              <div className="section-label mt-0.5">{s.label}</div>
+              <div className="section-label mt-1">{s.label}</div>
             </div>
           ))}
         </div>

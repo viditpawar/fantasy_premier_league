@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter, Geist_Mono } from "next/font/google";
 import { Nav } from "@/components/Nav";
 import { BottomNav } from "@/components/BottomNav";
 import { GameweekStrip } from "@/components/GameweekStrip";
@@ -15,7 +15,7 @@ import {
 } from "@/lib/queries";
 import "./globals.css";
 
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
+const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const dynamic = "force-dynamic";
@@ -83,7 +83,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full`}
+      className={`${inter.variable} ${geistMono.variable} h-full`}
       suppressHydrationWarning
     >
       <head>

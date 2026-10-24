@@ -73,27 +73,22 @@ export default async function PlayerDetailPage(props: PageProps<"/players/[code]
         <IconArrowLeft className="h-4 w-4" /> Player explorer
       </Link>
 
-      <header
-        className="relative mb-5 overflow-hidden rounded-[var(--radius-lg)] border border-border px-5 py-6 shadow-[var(--shadow-glow)] sm:px-7"
-        style={{
-          background: `radial-gradient(90% 140% at 0% 0%, color-mix(in oklab, ${positionColor(meta.position)} 45%, transparent) 0%, transparent 60%), var(--surface-1)`,
-        }}
-      >
+      <header className="card relative mb-5 overflow-hidden px-5 py-6 sm:px-7">
         <div className="relative flex items-center gap-5">
           <div className="relative shrink-0">
             <div
-              className="absolute -inset-2 rounded-xl opacity-50 blur-lg"
+              className="absolute -inset-2 rounded-xl opacity-30 blur-lg"
               style={{ background: positionColor(meta.position) }}
             />
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={PHOTO(meta.playerCode)}
               alt=""
-              className="relative h-24 w-[4.75rem] rounded-xl bg-surface-2 object-cover object-top shadow-lg"
+              className="relative h-24 w-[4.75rem] rounded-xl bg-surface-2 object-cover object-top"
             />
           </div>
           <div className="min-w-0">
-            <h1 className="truncate text-3xl font-extrabold tracking-tight text-fg">{meta.player}</h1>
+            <h1 className="large-title truncate">{meta.player}</h1>
             <p className="flex items-center gap-1.5 text-sm text-fg-muted">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={CREST_URL(meta.teamCode)} alt="" className="h-4 w-4 object-contain" />
