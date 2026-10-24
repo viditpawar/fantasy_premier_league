@@ -222,6 +222,7 @@ export function FixtureTicker({
         <div className="relative ml-auto">
           <IconSearch className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-subtle" />
           <input
+            aria-label="Filter fixtures by club"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Filter club…"

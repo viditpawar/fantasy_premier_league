@@ -1,49 +1,12 @@
 "use client";
-
-import { useState } from "react";
-
-type Theme = "light" | "dark" | "system";
-
-const ORDER: Theme[] = ["system", "light", "dark"];
-
-function readTheme(): Theme {
-  if (typeof window === "undefined") return "system";
-  try {
-    const stored = localStorage.getItem("theme") as Theme | null;
-    if (stored && ORDER.includes(stored)) return stored;
-  } catch {}
-  return "system";
+import { useSyncExternalStore } from "react";
+function subscribe(callback: () => void) { window.addEventListener("fpl:theme", callback); window.addEventListener("storage", callback); return () => { window.removeEventListener("fpl:theme", callback); window.removeEventListener("storage", callback); }; }
+export function useTheme() {
+  const theme = useSyncExternalStore(subscribe, () => document.documentElement.dataset.theme === "dark" ? "dark" : "light", () => "light");
+  function setTheme(next: "light" | "dark") { document.documentElement.dataset.theme = next; try { localStorage.setItem("theme", next); } catch {} window.dispatchEvent(new Event("fpl:theme")); }
+  return { theme, setTheme };
 }
-
-function apply(theme: Theme) {
-  const root = document.documentElement;
-  if (theme === "system") root.removeAttribute("data-theme");
-  else root.setAttribute("data-theme", theme);
-  try {
-    localStorage.setItem("theme", theme);
-  } catch {}
-}
-
 export function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>(readTheme);
-
-  function cycle() {
-    const next = ORDER[(ORDER.indexOf(theme) + 1) % ORDER.length];
-    setTheme(next);
-    apply(next);
-  }
-
-  const icon = theme === "dark" ? "🌙" : theme === "light" ? "☀️" : "🖥️";
-
-  return (
-    <button
-      onClick={cycle}
-      aria-label={`Theme: ${theme}. Click to change.`}
-      title={`Theme: ${theme}`}
-      className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-sm text-fg-muted transition-colors hover:border-border-strong hover:text-fg"
-      suppressHydrationWarning
-    >
-      {icon}
-    </button>
-  );
+  const { theme, setTheme } = useTheme();
+  return <button className="icon-button" onClick={() => setTheme(theme === "light" ? "dark" : "light")} aria-label={`Switch to ${theme === "light" ? "dark" : "light"} appearance`} title="Change appearance"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">{theme === "light" ? <><circle cx="12" cy="12" r="3.7" /><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.4 1.4m11.2 11.2L19 19M5 19l1.4-1.4M17.6 6.4 19 5" /></> : <path d="M20.5 14A8.7 8.7 0 0 1 10 3.5 8.7 8.7 0 1 0 20.5 14Z" />}</svg></button>;
 }

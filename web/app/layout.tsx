@@ -1,107 +1,53 @@
 import type { Metadata } from "next";
-import { Inter, Geist_Mono } from "next/font/google";
+import { Inter } from "next/font/google";
 import { Nav } from "@/components/Nav";
 import { Sidebar } from "@/components/Sidebar";
 import { BottomNav } from "@/components/BottomNav";
-import { GameweekStrip } from "@/components/GameweekStrip";
 import { CommandPalette, type CommandItem } from "@/components/ui/CommandPalette";
 import { PageTransition } from "@/components/PageTransition";
-import { getSupabase } from "@/lib/supabase";
-import {
-  getCurrentSeason,
-  getGameweekMeta,
-  getLiveGameweek,
-  getPlayers,
-  getTeamId,
-} from "@/lib/queries";
+import { getWorkspace } from "@/lib/workspace";
+import { getGameweekMeta, getPlayers } from "@/lib/queries";
+import Link from "next/link";
 import "./globals.css";
 
-const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
-
+const inter = Inter({ variable: "--font-inter", subsets: ["latin"], display: "swap" });
 export const dynamic = "force-dynamic";
-
 export const metadata: Metadata = {
-  title: { default: "FPL Cockpit", template: "%s · FPL Cockpit" },
-  description: "A modern Fantasy Premier League cockpit — squad, fixtures, analytics, live scores.",
+  title: { default: "Overview · FPL Cockpit", template: "%s · FPL Cockpit" },
+  description: "A clearer view of your fantasy season. Your squad, performance, fixtures and next move, beautifully connected.",
+  icons: { icon: "/icon.svg" },
 };
+const NO_FLASH = `(function(){try{var t=localStorage.getItem('theme');document.documentElement.dataset.theme=t==='dark'?'dark':'light';}catch(e){}})();`;
 
-const NO_FLASH = `(function(){try{var t=localStorage.getItem('theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();`;
-
-async function loadShell(): Promise<{
-  strip: React.ComponentProps<typeof GameweekStrip> | null;
-  commandItems: CommandItem[];
-}> {
+async function loadShell() {
   try {
-    const sb = getSupabase();
-    const season = await getCurrentSeason(sb);
-    const [{ current, next }, teamId] = await Promise.all([
-      getGameweekMeta(sb, season),
-      getTeamId(sb).catch(() => null),
+    const { sb, season, manager, team } = await getWorkspace();
+    const [meta, players] = await Promise.all([
+      getGameweekMeta(sb, season).catch(() => null),
+      getPlayers(sb, season, new Set()).catch(() => []),
     ]);
-
-    const gw = current ?? next;
-    let liveTotal: number | null = null;
-    let phase: "live" | "upcoming" | "done" = "done";
-    if (current && !current.finished) {
-      phase = "live";
-      if (teamId) liveTotal = (await getLiveGameweek(sb, teamId, season).catch(() => null))?.liveTotal ?? null;
-    } else if (next) {
-      phase = "upcoming";
-    }
-
-    const squadCodes = new Set<number>();
-    const players = await getPlayers(sb, season, squadCodes).catch(() => []);
-    const commandItems: CommandItem[] = players.slice(0, 700).map((p) => ({
-      id: `player:${p.playerCode}`,
-      label: p.player,
-      sub: `${p.team} · ${p.position}`,
-      href: `/players/${p.playerCode}`,
-      group: "Players",
-    }));
-
-    return {
-      strip: gw
-        ? {
-            gwName: gw.name,
-            deadline: (next ?? current)?.deadlineTime ?? null,
-            averageScore: (current ?? next)?.averageEntryScore ?? null,
-            highestScore: (current ?? next)?.highestScore ?? null,
-            phase,
-            liveTotal,
-          }
-        : null,
-      commandItems,
-    };
+    const commandItems: CommandItem[] = players.map((p) => ({ id: `player:${p.playerCode}`, label: p.player, sub: `${p.team} · ${p.position}`, href: `/players/${p.playerCode}`, group: "Players" }));
+    return { season, manager, team, live: !!meta?.current && !meta.current.finished, commandItems };
   } catch {
-    return { strip: null, commandItems: [] };
+    return { season: "FPL", manager: "Your workspace", team: "Fantasy Premier League", live: false, commandItems: [] as CommandItem[] };
   }
 }
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
-  const { strip, commandItems } = await loadShell();
-
-  return (
-    <html
-      lang="en"
-      className={`${inter.variable} ${geistMono.variable} h-full`}
-      suppressHydrationWarning
-    >
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: NO_FLASH }} />
-      </head>
-      <body className="flex min-h-full overflow-x-hidden">
-        <Sidebar />
-        <div className="flex min-w-0 flex-1 flex-col">
-          <Nav />
-          {strip && <GameweekStrip {...strip} />}
-          <div className="flex-1 overflow-x-clip pb-20 md:pb-0">
-            <PageTransition>{children}</PageTransition>
-          </div>
+  const shell = await loadShell();
+  return <html lang="en" className={`${inter.variable} h-full`} suppressHydrationWarning>
+    <head><script dangerouslySetInnerHTML={{ __html: NO_FLASH }} /></head>
+    <body className="flex min-h-full">
+      <a href="#main-content" className="skip-link">Skip to content</a>
+      <Sidebar {...shell} />
+      <div className="min-w-0 flex-1">
+        <Nav season={shell.season} manager={shell.manager} />
+        <div id="main-content" tabIndex={-1} className="pb-20 outline-none md:pb-0">
+          <PageTransition>{children}</PageTransition>
+          <footer className="page-container !pt-0"><div className="app-footer"><span>Made for the love of the game.<span className="mx-2 text-border-strong">·</span>FPL Cockpit</span><span>Independent of the Premier League.<span className="mx-2 text-border-strong">·</span><Link href="/settings" className="hover:text-fg">Data & information ↗</Link></span></div></footer>
         </div>
-        <BottomNav />
-        <CommandPalette items={commandItems} />
-      </body>
-    </html>
-  );
+      </div>
+      <BottomNav /><CommandPalette items={shell.commandItems} />
+    </body>
+  </html>;
 }

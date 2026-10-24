@@ -7,12 +7,10 @@ import { DataTable, type Column } from "./ui/DataTable";
 import { Sparkline } from "./ui/Sparkline";
 import { SegmentedControl } from "./ui/SegmentedControl";
 import { PlayerTile } from "./PlayerTile";
+import { PlayerKit } from "./PlayerKit";
 import { CompareBar } from "./CompareBar";
 import { IconGrid, IconList, IconSearch } from "./icons";
 import { money } from "@/lib/format";
-
-const SHIRT_URL = (code: number) =>
-  `https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_${code}-66.png`;
 
 const POSITIONS: (Position | "ALL")[] = ["ALL", "GKP", "DEF", "MID", "FWD"];
 const MAX_COMPARE = 4;
@@ -38,6 +36,7 @@ function Toggle({
   return (
     <button
       type="button"
+      aria-pressed={checked}
       onClick={() => onChange(!checked)}
       className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
         checked
@@ -67,7 +66,7 @@ export function PlayerExplorer({
   const [availableOnly, setAvailableOnly] = useState(false);
   const [ownedOnly, setOwnedOnly] = useState(false);
   const [selected, setSelected] = useState<number[]>([]);
-  const [view, setView] = useState<"table" | "cards">("cards");
+  const [view, setView] = useState<"table" | "cards">("table");
 
   const toggleSelected = (code: number) => {
     setSelected((prev) =>
@@ -118,8 +117,7 @@ export function PlayerExplorer({
       sortValue: (p) => p.player,
       render: (p) => (
         <span className="flex items-center gap-2">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={SHIRT_URL(p.teamCode)} alt="" className="h-5 w-5 shrink-0 object-contain" />
+          <PlayerKit code={p.teamCode} goalkeeper={p.position === "GKP"} className="h-7 w-7 shrink-0" />
           <span
             className="h-1.5 w-1.5 shrink-0 rounded-full"
             style={{ background: STATUS_DOT[p.status] ?? "var(--fg-subtle)" }}
@@ -209,15 +207,16 @@ export function PlayerExplorer({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="glass sticky top-0 z-10 -mx-4 flex flex-col gap-2.5 border-b border-border px-4 py-3 sm:mx-0 sm:rounded-2xl sm:border">
+      <div className="card sticky top-[67px] z-10 flex flex-col gap-3 p-4 md:top-0">
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative min-w-[10rem] flex-1">
             <IconSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-subtle" />
             <input
+              aria-label="Search players by name"
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Search players…"
-              className="h-9 w-full rounded-full border border-border bg-surface-1 pl-9 pr-3 text-sm outline-none transition-colors focus:border-accent"
+              className="h-10 w-full rounded-xl border border-border bg-surface-0 pl-9 pr-3 text-xs outline-none transition-colors focus:border-accent"
             />
           </div>
           <SegmentedControl
@@ -233,6 +232,7 @@ export function PlayerExplorer({
                 view === "cards" ? "bg-accent text-[var(--accent-contrast)]" : "text-fg-subtle hover:text-fg"
               }`}
               aria-label="Card view"
+              aria-pressed={view === "cards"}
             >
               <IconGrid className="h-3.5 w-3.5" />
             </button>
@@ -242,6 +242,7 @@ export function PlayerExplorer({
                 view === "table" ? "bg-accent text-[var(--accent-contrast)]" : "text-fg-subtle hover:text-fg"
               }`}
               aria-label="Table view"
+              aria-pressed={view === "table"}
             >
               <IconList className="h-3.5 w-3.5" />
             </button>
@@ -249,6 +250,7 @@ export function PlayerExplorer({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <select
+            aria-label="Filter by club"
             value={teamFilter}
             onChange={(e) => setTeamFilter(e.target.value)}
             className="h-8 rounded-full border border-border bg-surface-1 px-3 text-xs outline-none transition-colors focus:border-accent"

@@ -2,11 +2,13 @@ import { Skeleton } from "./Skeleton";
 
 export function PageSkeleton({ variant = "grid" }: { variant?: "grid" | "table" | "pitch" }) {
   return (
-    <main className="mx-auto w-full max-w-4xl px-4 py-6">
-      <Skeleton className="mb-5 h-8 w-48" />
-      <div className="mb-6 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+    <main className="page-container" aria-label="Loading your workspace" aria-busy="true">
+      <Skeleton className="mb-3 h-3 w-24" />
+      <Skeleton className="mb-3 h-10 w-64" />
+      <Skeleton className="mb-7 h-3 w-72 max-w-full" />
+      <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className="h-20" />
+            <Skeleton key={i} className="h-32 rounded-2xl" />
         ))}
       </div>
       {variant === "pitch" && <Skeleton className="h-[420px] rounded-2xl" />}

@@ -1,36 +1,43 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# FPL Cockpit
 
-## Getting Started
+A Next.js companion for your Fantasy Premier League season, backed by the existing Supabase warehouse. The interface uses a light canvas, evergreen accents, Inter typography, rounded surfaces and restrained motion. An alternative dark appearance is saved per device.
 
-First, run the development server:
+## Develop
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+Run commands from `web/`. Install dependencies with `npm install`, copy `.env.local.example` to `.env.local`, and supply the existing Supabase URL and public read-only key. Then run `npm run dev` and visit http://localhost:3000.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The root repository's `.env` configures the Python pipeline. The web app reads `web/.env.local`; it does not require the database password or a service-role key.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## The workspace
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Route | Purpose |
+| --- | --- |
+| `/` | Overview: key metrics, interactive season chart, gameweek snapshot, squad preview, advisor summary, leagues and upcoming club fixtures |
+| `/squad` | Saved starting XI and bench, pitch/list switch, player detail panels, captain and availability checks |
+| `/live` | Match centre: saved gameweek points, captain multiplier, playing status and nearby league rivals |
+| `/dashboard` | Detailed rank, points and value charts, transfer momentum, differentials and top scorers |
+| `/players` | Searchable player explorer with position, club, availability and ownership filters; card/table views; comparison selection |
+| `/players/[code]` | Individual profile, game log, charts and fixtures |
+| `/players/compare?codes=…` | Compare two to four players |
+| `/fixtures` | Fixture difficulty ticker with gameweek windows and attack/defence perspectives |
+| `/fixtures?team=…` | Upcoming fixtures for a specific club |
+| `/transfers` | Saved AI transfer, captaincy and chip advice |
+| `/leagues` | Classic and head-to-head league summaries |
+| `/leagues/[id]` | Classic league standings, podium and nearby rivals |
+| `/settings` | Appearance, connection information, data refresh expectations and keyboard shortcuts |
 
-## Learn More
+`Ctrl/⌘ + K` opens workspace search. Player panels and search support keyboard navigation, focus management and Escape to close. All routes are accessible from the mobile navigation menu, with five frequent destinations in the bottom bar. Motion respects the reduced-motion preference.
 
-To learn more about Next.js, take a look at the following resources:
+## Data and boundaries
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The existing read-only queries and Python advisor/ingest workflow remain the source of truth. No example scores or squads are substituted for unavailable data. Errors show a retry view, while genuine empty results have purpose-specific messages.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The match centre reloads the warehouse snapshot every minute. Underlying scores still follow the ingest schedule, approximately every two hours. Team selections and transfers are performed on the official FPL site. The AI advisor shows its target gameweek and generated date; refreshing a page does not generate new advice.
 
-## Deploy on Vercel
+The shared shell and overview resolve the same manager and season through `lib/workspace.ts`. Design tokens and responsive layouts live in `app/globals.css`. Club-colour kit illustrations render locally as SVG. Deadline and generated-time labels use America/Phoenix (MST).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Validate and deploy
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+`npx tsc --noEmit` checks types. `npm run build` produces the production app; `npm run start` serves it locally. No additional dependencies were introduced by the redesign.
+
+For the existing Vercel deployment, keep the project root set to `web` and retain `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. The existing Python pipeline and database schema do not need to change for this interface.

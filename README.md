@@ -21,6 +21,8 @@ dashboard, and an LLM-based transfer/captaincy advisor.
 
 ## Features
 
+- **Overview** — a redesigned home for season metrics, interactive charts, squad previews,
+  gameweek snapshots, advisor insights, leagues, and upcoming fixtures.
 - **Squad** — live formation view of your current squad: captain/vice-captain,
   injury/suspension flags, next-fixture difficulty, points per player.
 - **Dashboard** — season points history, overall rank, and top scorers.
@@ -154,7 +156,7 @@ npm install
 npm run dev
 ```
 
-Visit http://localhost:3000 (squad), `/dashboard`, `/transfers` (AI transfer
+Visit http://localhost:3000 (overview), `/squad`, `/dashboard`, `/transfers` (AI transfer
 suggestions — see below), and `/leagues` (your classic/H2H league standings).
 
 ### Deploy to Vercel

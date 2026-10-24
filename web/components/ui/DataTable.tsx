@@ -60,14 +60,14 @@ export function DataTable<T>({
     });
   }
 
-  const pad = dense ? "px-2.5 py-1.5" : "px-3 py-2.5";
+  const pad = dense ? "px-4 py-3" : "px-5 py-4";
 
   return (
     <div className="card overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-full border-collapse text-sm">
+        <table className="w-full min-w-full border-collapse text-[12px]">
           <thead>
-            <tr className="border-b border-border">
+            <tr className="border-b border-border bg-surface-0/50">
               {columns.map((col) => {
                 const active = sort?.key === col.key;
                 const alignCls =
@@ -75,19 +75,15 @@ export function DataTable<T>({
                 return (
                   <th
                     key={col.key}
-                    className={`${pad} ${alignCls} ${col.hideBelow ? HIDE[col.hideBelow] : ""} text-[11px] font-bold uppercase tracking-wide text-fg-subtle ${
-                      col.sortValue ? "cursor-pointer select-none hover:text-fg" : ""
-                    } ${col.headerClassName ?? ""}`}
-                    onClick={col.sortValue ? () => toggleSort(col.key) : undefined}
+                    className={`${pad} ${alignCls} ${col.hideBelow ? HIDE[col.hideBelow] : ""} text-[9px] font-medium tracking-wide text-fg-muted ${col.headerClassName ?? ""}`}
+                    aria-sort={col.sortValue ? active ? sort!.dir === "asc" ? "ascending" : "descending" : "none" : undefined}
                   >
-                    <span className="inline-flex items-center gap-1">
+                    {col.sortValue ? <button type="button" onClick={() => toggleSort(col.key)} className="inline-flex items-center gap-1 py-1 hover:text-fg">
                       {col.header}
-                      {col.sortValue && (
                         <span className={active ? "text-accent" : "text-fg-subtle/50"}>
                           {active ? (sort!.dir === "asc" ? "▲" : "▼") : "↕"}
                         </span>
-                      )}
-                    </span>
+                    </button> : col.header}
                   </th>
                 );
               })}
@@ -105,9 +101,11 @@ export function DataTable<T>({
               <tr
                 key={rowKey(row)}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
+                tabIndex={onRowClick ? 0 : undefined}
+                onKeyDown={onRowClick ? (event) => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onRowClick(row); } } : undefined}
                 className={`border-b border-border/60 last:border-0 transition-colors ${
                   onRowClick ? "cursor-pointer hover:bg-surface-2" : ""
-                } ${i % 2 ? "bg-surface-2/30" : ""} ${rowClassName?.(row) ?? ""}`}
+                } ${rowClassName?.(row) ?? ""}`}
               >
                 {columns.map((col) => {
                   const alignCls =

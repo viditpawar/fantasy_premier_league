@@ -40,7 +40,6 @@ export default async function AnalyticsPage() {
   ]);
 
   const rd = rankDelta(analytics.currentRank, analytics.startRank);
-  const pointsSeries = analytics.rows.map((r) => r.points);
 
   return (
     <main className="animate-fade-in mx-auto w-full max-w-4xl px-4 py-6">
@@ -97,7 +96,7 @@ export default async function AnalyticsPage() {
           />
         </div>
         {analytics.teamValueSeries.length > 1 && (
-          <div className="card card-hover col-span-2 px-4 py-3.5 sm:col-span-4">
+          <div className="card card-hover col-span-full px-5 py-5">
             <div className="section-label mb-2">Squad value</div>
             <AreaTrend
               data={analytics.teamValueSeries as unknown as Record<string, number>[]}

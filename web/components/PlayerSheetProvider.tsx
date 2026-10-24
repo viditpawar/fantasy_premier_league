@@ -7,6 +7,7 @@ import { FDRCell } from "./ui/FDRCell";
 import { Badge } from "./ui/Badge";
 import type { SquadPlayer } from "@/lib/types";
 import { money } from "@/lib/format";
+import { PlayerKit } from "./PlayerKit";
 
 interface Ctx {
   open: (player: SquadPlayer) => void;
@@ -28,9 +29,6 @@ const STATUS_LABELS: Record<string, string> = {
   n: "Not in squad",
 };
 
-const SHIRT_URL = (code: number) =>
-  `https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_${code}-66.png`;
-
 export function PlayerSheetProvider({ children }: { children: ReactNode }) {
   const [player, setPlayer] = useState<SquadPlayer | null>(null);
 
@@ -41,8 +39,7 @@ export function PlayerSheetProvider({ children }: { children: ReactNode }) {
         {player && (
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-3">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={SHIRT_URL(player.teamCode)} alt="" className="h-12 w-12 object-contain" />
+              <PlayerKit code={player.teamCode} goalkeeper={player.position === "GKP"} className="h-14 w-14" />
               <div>
                 <div className="text-lg font-extrabold text-fg">{player.player}</div>
                 <div className="text-sm text-fg-muted">
