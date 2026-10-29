@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Manrope } from "next/font/google";
 import { DataFreshness } from "@/components/DataFreshness";
 import { Nav } from "@/components/Nav";
 import { Sidebar } from "@/components/Sidebar";
@@ -12,10 +12,11 @@ import Link from "next/link";
 import "./globals.css";
 
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"], display: "swap" });
+const display = Manrope({ variable: "--font-display", subsets: ["latin"], display: "swap" });
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: { default: "Overview · FPL Cockpit", template: "%s · FPL Cockpit" },
-  description: "A clearer view of your fantasy season. Your squad, performance, fixtures and next move, beautifully connected.",
+  description: "Your Fantasy Premier League command centre. Research players, rehearse lineups, plan transfers and prepare for every deadline with real FPL data.",
   icons: { icon: "/icon.svg" },
 };
 const NO_FLASH = `(function(){try{var t=localStorage.getItem('theme');document.documentElement.dataset.theme=t==='dark'?'dark':'light';}catch(e){}})();`;
@@ -36,7 +37,7 @@ async function loadShell() {
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   const shell = await loadShell();
-  return <html lang="en" className={`${inter.variable} h-full`} suppressHydrationWarning>
+  return <html lang="en" className={`${inter.variable} ${display.variable} h-full`} suppressHydrationWarning>
     <head><script dangerouslySetInnerHTML={{ __html: NO_FLASH }} /></head>
     <body className="flex min-h-full">
       <a href="#main-content" className="skip-link">Skip to content</a>

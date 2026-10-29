@@ -88,6 +88,8 @@ def context():
         "transfer_candidates": {"GKP": [], "DEF": [candidate], "MID": [], "FWD": []},
         "chip_advice": {},
         "warnings": [],
+        "model_version": "minutes-fixtures-v2",
+        "decision": {"transfer_options": [{"out_id": 2, "in_id": 100, "eligible": True}]},
     }
     result["context_id"] = context_fingerprint(result)
     return result
@@ -196,7 +198,7 @@ def test_recent_form_query_excludes_unfinished_gameweeks():
     assert get_recent_form(conn, "2026-27", [1001])[1001][0]["minutes"] == 90
     sql, params = cursor.execute.call_args.args
     assert "finished = true" in sql and "order by id desc limit" in sql
-    assert params == ("2026-27", [1001], "2026-27", 5)
+    assert params == ("2026-27", [1001], "2026-27", 8)
 
 
 def test_confirmed_snapshot_subtracts_used_transfer(context, state):
@@ -276,6 +278,53 @@ def test_valid_transfer_and_exact_profit_sharing_budget(context, suggestion):
     context["budget"]["bank"] = 1  # market price 50, real sale 48, cannot buy at 50
     with pytest.raises(ValueError, match="Illegal transfer"):
         validate_suggestion(context, suggestion)
+
+
+def test_legal_transfer_with_no_material_improvement_is_rejected(context, suggestion):
+    context["decision"]["transfer_options"][0]["eligible"] = False
+    with pytest.raises(ValueError, match="optimized XI"):
+        validate_suggestion(context, suggestion)
+
+
+def test_reply_without_current_decision_model_cannot_recommend_moves(context, suggestion):
+    del context["decision"]
+    with pytest.raises(ValueError, match="current decision model"):
+        validate_suggestion(context, suggestion)
+
+
+def test_fresh_current_squad_does_not_override_stale_ingestion(context, suggestion):
+    context["data_fresh"] = False
+    with pytest.raises(ValueError, match="Refresh ingestion"):
+        validate_suggestion(context, suggestion)
+
+
+def test_captain_must_pass_minutes_safety_shortlist(context, suggestion):
+    context["decision"]["captain_candidates"] = [7, 8]
+    with pytest.raises(ValueError, match="Captain"):
+        validate_suggestion(context, suggestion)
+
+
+def test_captain_can_start_in_optimized_legal_lineup(context, suggestion):
+    context["decision"]["lineup"] = {"starters": [1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 15]}
+    suggestion["captain"] = "Player 15"
+    assert validate_suggestion(context, suggestion)
+
+
+def test_retained_captain_must_start_after_every_transfer_alternative(context, suggestion):
+    context["decision"]["transfer_options"][0]["lineup"] = {
+        "formation": "3-4-3",
+        "starters": [1, 100, 3, 4, 5, 15, 7, 8, 9, 10, 11],
+        "bench": [6, 13, 14, 12],
+    }
+    with pytest.raises(ValueError, match="Captain"):
+        validate_suggestion(context, suggestion)
+
+
+def test_bench_boost_requires_minutes_from_starters_as_well_as_bench(context):
+    squad = context["squad"]
+    assert compute_chip_advice(squad, 9, ["bboost"])["bench_boost"]["recommended"]
+    squad[5]["recent_form"][0]["minutes"] = 1
+    assert not compute_chip_advice(squad, 9, ["bboost"])["bench_boost"]["recommended"]
 
 
 @pytest.mark.parametrize(
@@ -426,6 +475,8 @@ def warehouse(context, monkeypatch):
             result.fetchone.return_value = (9, NOW + timedelta(days=2))
         elif "max(gameweek)" in sql:
             result.fetchone.return_value = (6,)  # target must NOT become 7
+        elif "from data_refresh_status" in sql:
+            result.fetchone.return_value = (NOW,)
         elif "from manager_picks" in sql:
             result.fetchall.return_value = [
                 (p["player_id"], p["squad_position"], 48) for p in context["squad"]
@@ -478,6 +529,13 @@ def test_build_context_current_squad_and_budget(warehouse, state):
     updated = context_module.build_context(warehouse, state, NOW)
     assert not updated["transfer_candidates"]["DEF"]
     assert updated["context_id"] != result["context_id"]
+
+
+def test_build_context_no_free_transfers_never_urges_new_move(warehouse, state):
+    state["transfers"]["made"] = state["transfers"]["limit"]
+    result = context_module.build_context(warehouse, state, NOW)
+    assert result["decision"]["action"] == "roll"
+    assert not any(o["eligible"] for o in result["decision"]["transfer_options"])
 
 
 def test_current_state_must_match_season(warehouse, state):

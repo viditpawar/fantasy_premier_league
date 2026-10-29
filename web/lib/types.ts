@@ -93,6 +93,33 @@ export interface AdvisorSuggestion {
   lineupWatch: string[];
   chipAdvice: ChipAdvice | null;
   summary: string;
+  decision: AdvisorDecision | null;
+}
+
+export interface AdvisorDecision {
+  model_version: string;
+  horizon: number;
+  action: "roll" | "consider_transfer";
+  reason: string;
+  lineup: AdvisorLineup;
+  compared_candidates?: number;
+  compared_options?: number;
+  transfer_options: {
+    player_out: string; player_in: string; horizon_gain: number;
+    next_gameweek_gain: number; bank_after: number; eligible: boolean;
+    lineup?: AdvisorLineup;
+  }[];
+}
+
+export interface AdvisorLineup {
+  formation: string;
+  starters: number[];
+  bench: number[];
+  selection_note?: string | null;
+  warnings?: string[];
+  reliable_outfield_bench?: number[];
+  uncovered_starters?: number[];
+  coverage_note?: string;
 }
 
 export interface TransferMover {

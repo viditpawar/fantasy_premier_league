@@ -140,10 +140,46 @@ def context_fingerprint(context: dict) -> str:
         "state_verified",
         "chip_advice",
         "state_captured_at",
+        "model_version",
+        "decision",
+        "ranking_policy",
+        "data_refreshed_at",
+        "data_fresh",
     )
     fields = {key: context.get(key) for key in keys}
     encoded = json.dumps(fields, sort_keys=True, default=str, separators=(",", ":"))
     return hashlib.sha256(encoded.encode()).hexdigest()[:24]
+
+
+def validate_lineup(squad: list[dict], lineup: dict) -> None:
+    """Validate the entire proposed XI and bench, including the reserve keeper."""
+    starters, bench = lineup.get("starters"), lineup.get("bench")
+    if not isinstance(starters, list) or not isinstance(bench, list):
+        raise ValueError(  # noqa: TRY004 - consistent user-input validation errors
+            "Proposed lineup must contain a starting XI and an ordered bench."
+        )
+    ids = starters + bench
+    if any(type(i) is not int for i in ids):
+        raise ValueError("Proposed lineup IDs must be integers.")
+    if (
+        len(starters) != 11
+        or len(bench) != 4
+        or len(set(ids)) != 15
+        or set(ids) != {p["player_id"] for p in squad}
+    ):
+        raise ValueError(
+            "Proposed lineup must account for all 15 owned players exactly once."
+        )
+    by_id = {p["player_id"]: p for p in squad}
+    ordered = [{**by_id[i], "squad_position": slot} for slot, i in enumerate(ids, 1)]
+    validate_squad(ordered)
+    counts = Counter(by_id[i]["position"] for i in starters)
+    if lineup.get("formation") != f"{counts['DEF']}-{counts['MID']}-{counts['FWD']}":
+        raise ValueError("Proposed formation does not match the starting XI.")
+    if by_id[bench[-1]]["position"] != "GKP":
+        raise ValueError(
+            "Keep the reserve goalkeeper separate from the outfield bench order."
+        )
 
 
 def validate_suggestion(context: dict, suggestion: dict) -> dict:
@@ -161,6 +197,10 @@ def validate_suggestion(context: dict, suggestion: dict) -> dict:
         raise ValueError(
             "Supply --state with the confirmed current squad, bank and transfer counts before saving advice."
         )
+    if context.get("data_fresh") is False:
+        raise ValueError(
+            "Warehouse data is stale or unconfirmed. Refresh ingestion before saving advice."
+        )
     squad = context["squad"]
     validate_squad(squad)
     names = [p["player"] for p in squad]
@@ -172,6 +212,10 @@ def validate_suggestion(context: dict, suggestion: dict) -> dict:
     candidates = [p for group in context["transfer_candidates"].values() for p in group]
     seen = set()
     sold = set()
+    post_transfer_lineups = []
+    baseline = context.get("decision", {}).get("lineup")
+    if baseline and "bench" in baseline:
+        validate_lineup(squad, baseline)
     for key in ("recommended_transfers", "hit_transfers"):
         moves = suggestion.get(key)
         if not isinstance(moves, list) or len(moves) > 3:
@@ -217,6 +261,34 @@ def validate_suggestion(context: dict, suggestion: dict) -> dict:
                 raise ValueError(
                     "Illegal transfer: check position, ownership, availability, real selling price, bank and club limit."
                 )
+            decision = context.get("decision")
+            if decision is None:
+                raise ValueError(
+                    "Advice requires a current decision model; generate a fresh prompt."
+                )
+            option = next(
+                (
+                    option
+                    for option in decision["transfer_options"]
+                    if (
+                        option["out_id"] == outgoing["player_id"]
+                        and option["in_id"] == incoming["player_id"]
+                        and option["eligible"]
+                    )
+                ),
+                None,
+            )
+            if option is None:
+                raise ValueError(
+                    "Transfer does not improve the optimized XI enough to justify using a free transfer."
+                )
+            if option.get("lineup"):
+                changed = [
+                    incoming if p["player_id"] == outgoing["player_id"] else p
+                    for p in squad
+                ]
+                validate_lineup(changed, option["lineup"])
+                post_transfer_lineups.append(set(option["lineup"]["starters"]))
     for key in ("summary", "captaincy_reasoning"):
         if not isinstance(suggestion.get(key), str) or not suggestion[key].strip():
             raise ValueError(f"{key} must be a non-empty string.")
@@ -226,6 +298,11 @@ def validate_suggestion(context: dict, suggestion: dict) -> dict:
     ):
         raise ValueError("lineup_watch must be a list of non-empty strings.")
     captains = []
+    starter_ids = set(
+        context.get("decision", {})
+        .get("lineup", {})
+        .get("starters", [p["player_id"] for p in squad if p["squad_position"] <= 11])
+    )
     for key in ("captain", "vice_captain"):
         player = (
             by_name.get(suggestion.get(key))
@@ -234,7 +311,15 @@ def validate_suggestion(context: dict, suggestion: dict) -> dict:
         )
         if (
             not player
-            or player["squad_position"] > 11
+            or player["player_id"] not in starter_ids
+            or any(
+                player["player_id"] not in starters
+                for starters in post_transfer_lineups
+            )
+            or (
+                "captain_candidates" in context.get("decision", {})
+                and player["player_id"] not in context["decision"]["captain_candidates"]
+            )
             or not available(player)
             or not player.get("next_gameweek_fixture_count")
             or player["player_id"] in sold

@@ -1,5 +1,18 @@
 type IconProps = { className?: string };
 
+export function IconCheck({ className }: IconProps) {
+  return <svg {...base} className={className} aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg>;
+}
+export function IconFlask({ className }: IconProps) {
+  return <svg {...base} className={className} aria-hidden="true"><path d="M9 3h6M10 3v6l-6 10a1 1 0 0 0 1 2h14a1 1 0 0 0 1-2L14 9V3M8 14h8" /><path d="m9 18 .01 0m5-2 .01 0" /></svg>;
+}
+export function IconTarget({ className }: IconProps) {
+  return <svg {...base} className={className} aria-hidden="true"><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="4" /><path d="M12 2v3m0 14v3M2 12h3m14 0h3" /></svg>;
+}
+export function IconDownload({ className }: IconProps) {
+  return <svg {...base} className={className} aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5" /></svg>;
+}
+
 export function IconArrowRight({ className }: IconProps) {
   return <svg {...base} className={className} aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" /></svg>;
 }

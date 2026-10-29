@@ -1,5 +1,5 @@
 import os
-from datetime import date
+from datetime import UTC, date, datetime
 
 from dotenv import load_dotenv
 
@@ -13,7 +13,7 @@ FPL_PASSWORD = os.environ.get("FPL_PASSWORD") or None
 
 def current_season(today: date | None = None) -> str:
     """FPL season label, e.g. '2025-26'. Seasons run August through May."""
-    today = today or date.today()
+    today = today or datetime.now(UTC).date()
     start_year = today.year if today.month >= 7 else today.year - 1
     return f"{start_year}-{str(start_year + 1)[-2:]}"
 
