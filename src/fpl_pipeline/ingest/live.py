@@ -184,6 +184,13 @@ def ingest_player_gameweek_stats(
             explain = element.get("explain") or []
             fixture_id = explain[0]["fixture"] if explain else None
             team_id = player_team.get(player_id)
+            fixture_count = sum(
+                f.get("event") == gw and team_id in (f["team_h"], f["team_a"])
+                for f in fixtures
+            )
+            if fixture_count > 1:
+                # The statistics below are event totals, not one match's facts.
+                fixture_id = None
             fixture = fixture_by_id.get(fixture_id) if fixture_id else None
             was_home = fixture["team_h"] == team_id if fixture else None
             opponent_team_id = None
@@ -224,6 +231,9 @@ def ingest_player_gameweek_stats(
                     float(element["selected_by_percent"]) if element else None,
                     element.get("transfers_in_event") if element else None,
                     element.get("transfers_out_event") if element else None,
+                    stats.get("expected_goals"),
+                    stats.get("expected_assists"),
+                    fixture_count,
                 )
             )
 
@@ -235,9 +245,10 @@ def ingest_player_gameweek_stats(
                 own_goals, penalties_saved, penalties_missed, yellow_cards,
                 red_cards, saves, bonus, bps, influence, creativity, threat,
                 ict_index, total_points, value, selected, transfers_in,
-                transfers_out)
+                transfers_out, expected_goals, expected_assists, fixture_count)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                %s, %s, %s)
             ON CONFLICT (season, player_code, gameweek) DO UPDATE SET
                 player_id = EXCLUDED.player_id,
                 fixture_id = EXCLUDED.fixture_id,
@@ -265,7 +276,10 @@ def ingest_player_gameweek_stats(
                 value = EXCLUDED.value,
                 selected = EXCLUDED.selected,
                 transfers_in = EXCLUDED.transfers_in,
-                transfers_out = EXCLUDED.transfers_out
+                transfers_out = EXCLUDED.transfers_out,
+                expected_goals = EXCLUDED.expected_goals,
+                expected_assists = EXCLUDED.expected_assists,
+                fixture_count = EXCLUDED.fixture_count
             """,
             rows,
         )

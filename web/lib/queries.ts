@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { cache } from "react";
 import { matchweekTotals } from "./matchweek";
+import { advisorStatus } from "./advisor";
 import {
   AdvisorSuggestion,
   Budget,
@@ -256,6 +257,7 @@ export async function getAdvisorSuggestion(
       version?: number;
       state_verified?: boolean;
       state_captured_at?: string;
+      data_refreshed_at?: string;
       transfer_state?: { remaining?: number | null };
     };
     chip_advice?: {
@@ -265,6 +267,7 @@ export async function getAdvisorSuggestion(
       triple_captain: ChipRecommendation;
     };
     summary: string;
+    decision?: AdvisorSuggestion["decision"];
   };
 
   const chipAdvice: ChipAdvice | null = suggestion.chip_advice
@@ -279,19 +282,7 @@ export async function getAdvisorSuggestion(
   const { data: event, error: eventError } = await sb.from("gameweeks")
     .select("deadline_time").eq("season", season).eq("id", data.for_gameweek).maybeSingle();
   if (eventError) throw eventError;
-  const deadline = event?.deadline_time ? Date.parse(event.deadline_time) : NaN;
-  const capturedAt = Date.parse(suggestion.validation?.state_captured_at ?? "");
-  const verified = suggestion.validation?.version === 1 && suggestion.validation.state_verified === true;
-  const expired = Number.isFinite(deadline) && deadline <= Date.now();
-  const fresh = Number.isFinite(capturedAt) && Date.now() - capturedAt <= 24 * 60 * 60 * 1000 && capturedAt <= Date.now() + 5 * 60 * 1000;
-  const isCurrent = verified && !expired && fresh && Number.isFinite(deadline);
-  const reviewNote = expired
-    ? `Saved advice for GW${data.for_gameweek}. That deadline has passed; these picks are for reference.`
-    : !verified
-      ? "This saved advice predates squad and transfer validation. Check your current squad, selling prices and remaining free transfers in FPL."
-      : !isCurrent
-        ? "This advice uses an older squad snapshot. Check any transfers, prices and team news that have changed since it was saved."
-        : null;
+  const { isCurrent, reviewNote } = advisorStatus(suggestion.validation, event?.deadline_time, data.for_gameweek);
   const unlimitedTransfers = isCurrent && suggestion.validation?.transfer_state?.remaining === null;
   return {
     forGameweek: data.for_gameweek,
@@ -308,6 +299,7 @@ export async function getAdvisorSuggestion(
     lineupWatch: suggestion.lineup_watch ?? [],
     chipAdvice,
     summary: suggestion.summary,
+    decision: suggestion.decision ?? null,
   };
 }
 

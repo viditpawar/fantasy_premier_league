@@ -2,6 +2,8 @@
 archive, since FPL's own API only exposes the current season.
 """
 
+from types import SimpleNamespace
+
 import numpy as np
 import pandas as pd
 import psycopg
@@ -10,6 +12,37 @@ from fpl_pipeline.config import completed_seasons
 from fpl_pipeline.db.connection import get_connection
 
 DATA_BASE_URL = "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/master/data"
+
+ADDITIVE_STATS = (
+    "minutes", "goals_scored", "assists", "clean_sheets", "goals_conceded",
+    "own_goals", "penalties_saved", "penalties_missed", "yellow_cards",
+    "red_cards", "saves", "bonus", "bps", "influence", "creativity", "threat",
+    "ict_index", "total_points", "expected_goals", "expected_assists",
+)
+
+
+def aggregate_gameweeks(frame: pd.DataFrame) -> list[SimpleNamespace]:
+    """The archive is per fixture; our fact table is per gameweek.
+
+    Upserting each match independently used to overwrite the first half of a
+    double. Sum match facts and retain the last snapshot for price/ownership.
+    """
+    records = frame.drop_duplicates(subset=["element", "GW", "fixture"], keep="last")
+    if "kickoff_time" in records.columns:
+        records = records.sort_values("kickoff_time")
+    result = []
+    for _, group in records.groupby(["element", "GW"], sort=False):
+        row = group.iloc[-1].to_dict()
+        for name in ADDITIVE_STATS:
+            if name not in group or group[name].isna().any():
+                row[name] = None
+            else:
+                row[name] = float(pd.to_numeric(group[name]).sum())
+        row["fixture_count"] = len(group)
+        if len(group) > 1:
+            row.update(fixture=None, opponent_team=None, was_home=None)
+        result.append(SimpleNamespace(**row))
+    return result
 
 
 def _fetch_csv(season: str, path: str) -> pd.DataFrame:
@@ -161,7 +194,7 @@ def ingest_player_gameweek_stats_historical(
 
     rows = []
     skipped = 0
-    for r in merged_gw_df.itertuples():
+    for r in aggregate_gameweeks(merged_gw_df):
         player_code = player_code_by_id.get(r.element)
         if player_code is None:
             skipped += 1
@@ -198,6 +231,9 @@ def ingest_player_gameweek_stats_historical(
                 r.selected,
                 r.transfers_in,
                 r.transfers_out,
+                r.expected_goals,
+                r.expected_assists,
+                r.fixture_count,
             )
         )
 
@@ -212,9 +248,10 @@ def ingest_player_gameweek_stats_historical(
             own_goals, penalties_saved, penalties_missed, yellow_cards,
             red_cards, saves, bonus, bps, influence, creativity, threat,
             ict_index, total_points, value, selected, transfers_in,
-            transfers_out)
+            transfers_out, expected_goals, expected_assists, fixture_count)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+            %s, %s, %s)
         ON CONFLICT (season, player_code, gameweek) DO UPDATE SET
             player_id = EXCLUDED.player_id,
             fixture_id = EXCLUDED.fixture_id,
@@ -242,7 +279,10 @@ def ingest_player_gameweek_stats_historical(
             value = EXCLUDED.value,
             selected = EXCLUDED.selected,
             transfers_in = EXCLUDED.transfers_in,
-            transfers_out = EXCLUDED.transfers_out
+            transfers_out = EXCLUDED.transfers_out,
+            expected_goals = EXCLUDED.expected_goals,
+            expected_assists = EXCLUDED.expected_assists,
+            fixture_count = EXCLUDED.fixture_count
         """,
         rows,
     )

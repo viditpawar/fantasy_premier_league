@@ -8,12 +8,13 @@ from psycopg.rows import dict_row
 
 from fpl_pipeline.config import FPL_TEAM_ID
 
+from .evaluation import evaluate_warehouse, ranking_policy
+from .model import MODEL_VERSION, apply_ranking_policy, decision_context, week_score
 from .rules import (
     CHIPS,
     POSITIONS,
     available,
     context_fingerprint,
-    fixture_score,
     form_score,
     integer,
     legal_swap,
@@ -57,13 +58,18 @@ def _players(conn, season: str) -> list[dict]:
 
 
 def get_recent_form(
-    conn, season: str, player_codes: list[int], last_n: int = 5
+    conn, season: str, player_codes: list[int], last_n: int = 8
 ) -> dict[int, list[dict]]:
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(
             """
-            select player_code, gameweek, total_points, minutes
-            from player_gameweek_stats
+            select s.player_code, s.gameweek, s.total_points, s.minutes,
+                s.goals_scored, s.assists, s.expected_goals, s.expected_assists,
+                coalesce(s.fixture_count, (
+                    select count(*) from fixtures f where f.season = s.season
+                    and f.gameweek = s.gameweek and s.team_id in (f.team_h, f.team_a)
+                )) as fixture_count
+            from player_gameweek_stats s
             where season = %s and player_code = any(%s) and gameweek in (
                 select id from gameweeks where season = %s and finished = true
                 order by id desc limit %s
@@ -211,6 +217,7 @@ def compute_chip_advice(
     target: int,
     available_chips: list[str] | None = None,
     active_chip: str | None = None,
+    lineup: dict | None = None,
 ) -> dict:
     """Conservative planning signals, gated on confirmed chip availability."""
     fit = [p for p in squad if available(p) and p["next_gameweek_fixture_count"] > 0]
@@ -224,17 +231,21 @@ def compute_chip_advice(
         if d + m + f == 10
     )
     unavailable = sum(not available(p) for p in squad)
-    bench = [p for p in squad if p["squad_position"] > 11]
-    bench_ready = all(
+    # Bench Boost scores all 15. Reliable reserves cannot compensate for a
+    # non-playing nominal starter; inspect minutes across the whole squad.
+    squad_ready = all(
         available(p)
         and p["next_gameweek_fixture_count"] > 0
         and p["recent_form"]
-        and p["recent_form"][0]["minutes"] >= 60
-        for p in bench
+        and any(r.get("fixture_count", 1) > 0 for r in p["recent_form"][:2])
+        and sum(r["minutes"] for r in p["recent_form"][:2])
+        >= 60 * sum(r.get("fixture_count", 1) for r in p["recent_form"][:2])
+        for p in squad
     )
+    starter_ids = set(lineup["starters"]) if lineup else {p["player_id"] for p in squad if p["squad_position"] <= 11}
     captain_double = any(
         available(p)
-        and p["squad_position"] <= 11
+        and p["player_id"] in starter_ids
         and p["next_gameweek_fixture_count"] >= 2
         and p["form_score"] >= 5
         for p in squad
@@ -249,7 +260,7 @@ def compute_chip_advice(
             f"At most {playable} available players fit a starting formation in GW{target}; compare a temporary Free Hit with longer-term repairs.",
         ),
         "bench_boost": (
-            bench_ready and len(fit) == 15,
+            squad_ready and len(fit) == 15,
             "Assess all four substitutes' likely minutes. Bench Boost can work in a single or double gameweek.",
         ),
         "triple_captain": (
@@ -353,6 +364,14 @@ def build_context(
         )
     all_codes = [p["player_code"] for p in players]
     form = get_recent_form(conn, season, all_codes)
+    policy = ranking_policy(evaluate_warehouse(conn))
+    refresh = conn.execute(
+        "select completed_at from data_refresh_status where season = %s", (season,)
+    ).fetchone()
+    refreshed_at = refresh[0] if refresh else None
+    data_fresh = refreshed_at is not None and now - timedelta(hours=6) <= refreshed_at <= now + timedelta(minutes=5)
+    if not data_fresh:
+        warnings.append("Warehouse freshness is unconfirmed or older than six hours. Run ingestion before saving advice.")
     fixtures = get_upcoming_fixtures(conn, season, target)
     yellows = dict(
         conn.execute(
@@ -374,12 +393,10 @@ def build_context(
         p["recent_form"] = form.get(p["player_code"], [])
         p["upcoming_fixtures"] = fixtures.get(p["team_id"], [])
         p["form_score"] = form_score(p["recent_form"])
-        p["score"] = fixture_score(
-            p["recent_form"], p["upcoming_fixtures"], target, min(3, 39 - target)
-        )
-        p["captain_score"] = fixture_score(
-            p["recent_form"], p["upcoming_fixtures"], target, 1
-        )
+        p["performance"] = apply_ranking_policy(p, policy)
+        horizon = min(4, 39 - target)
+        p["score"] = round(sum(week_score(p, gw) for gw in range(target, target + horizon)) / horizon, 3)
+        p["captain_score"] = week_score(p, target)
         p["next_gameweek_fixture_count"] = sum(
             f["gameweek"] == target for f in p["upcoming_fixtures"]
         )
@@ -425,28 +442,28 @@ def build_context(
         if state is not None:
             pool = [p for p in pool if p["affordable_for"]]
         pool.sort(key=lambda p: (-p["score"], p["price"], p["player_id"]))
-        # Retain the strongest option for every outgoing player as well as the
-        # global shortlist, even if only one inexpensive option is affordable.
-        shortlist = pool[:12]
-        if state is not None:
-            for owned_player in squad:
-                best = next(
-                    (p for p in pool if owned_player["player"] in p["affordable_for"]),
-                    None,
-                )
-                if best is not None and best not in shortlist:
-                    shortlist.append(best)
-        candidates[position] = shortlist
+        candidates[position] = pool
+    # Compare every legal candidate with the full squad before reducing the
+    # prompt. A raw form shortlist can hide the best cover or positional swap.
+    decision = decision_context(squad, candidates, target, bank)
+    selected_ids = {option["in_id"] for option in decision["transfer_options"]}
+    for position, pool in candidates.items():
+        candidates[position] = [p for index, p in enumerate(pool) if index < 12 or p["player_id"] in selected_ids]
     chip_advice = compute_chip_advice(
         squad,
         target,
         state.get("available_chips") if state else None,
         state.get("active_chip") if state else None,
+        decision["lineup"],
     )
     warnings.append(
         "Form and fixtures are warehouse snapshots; refresh ingestion and team news before using advice. Scores rank options and are not expected points. No points-hit recommendation is supported."
     )
     context = {
+        "model_version": MODEL_VERSION,
+        "ranking_policy": policy,
+        "data_refreshed_at": refreshed_at.isoformat() if refreshed_at else None,
+        "data_fresh": data_fresh,
         "season": season,
         "team_id": team_id,
         "gameweek": latest,
@@ -461,6 +478,12 @@ def build_context(
         "transfer_candidates": candidates,
         "chip_advice": chip_advice,
         "warnings": warnings,
+        "decision": decision,
     }
+    if transfers is not None and transfers["remaining"] == 0:
+        context["decision"]["action"] = "roll"
+        context["decision"]["reason"] = "No free transfers remain. Use the best existing XI; paid hits are disabled."
+        for option in context["decision"]["transfer_options"]:
+            option["eligible"] = False
     context["context_id"] = context_fingerprint(context)
     return context

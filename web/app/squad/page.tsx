@@ -8,7 +8,7 @@ import { SquadView } from "@/components/SquadView";
 import { PlayerKit } from "@/components/PlayerKit";
 import { Hero } from "@/components/ui/Hero";
 import { FDRCell } from "@/components/ui/FDRCell";
-import { IconArrowRight, IconBolt, IconPitch, IconShield } from "@/components/icons";
+import { IconArrowRight, IconPitch, IconShield } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "My squad" };
@@ -25,7 +25,7 @@ export default async function SquadPage() {
   const flags = squad.filter((p) => p.status !== "a");
   const isLive = !!meta.current && !meta.current.finished && live?.gameweek === meta.current.id;
   return <main className="page-container animate-fade-in">
-    <Hero title="Your fifteen. Your game." eyebrow={`${season} · Gameweek ${gameweek}`} icon={<IconPitch />} subtitle={`${team}. Every player, every fixture, every possibility.`} action={<Link href="/live" className="button-secondary"><IconBolt />Match centre<IconArrowRight /></Link>} stats={[{ label: "Season points", value: budget.totalPoints.toLocaleString("en-GB"), accent: true }, { label: "Overall rank", value: budget.overallRank ? `#${budget.overallRank.toLocaleString("en-GB")}` : "—" }, { label: "Squad value", value: money(budget.teamValue) }, { label: "In the bank", value: money(budget.bank) }]} />
+    <Hero title="Your fifteen. Your game." eyebrow={`${season} · Gameweek ${gameweek}`} icon={<IconPitch />} subtitle={`${team}. Every player, every fixture, every possibility.`} action={<Link href="/lineup" className="button-secondary"><IconPitch />Open lineup studio<IconArrowRight /></Link>} stats={[{ label: "Season points", value: budget.totalPoints.toLocaleString("en-GB"), accent: true }, { label: "Overall rank", value: budget.overallRank ? `#${budget.overallRank.toLocaleString("en-GB")}` : "—" }, { label: "Squad value", value: money(budget.teamValue) }, { label: "In the bank", value: money(budget.bank) }]} />
     <div className="overview-grid">
       <div className="min-w-0"><SquadView starting={starting} bench={bench} liveByCode={isLive && live ? new Map(live.players.map((p) => [p.playerCode, p.livePoints])) : undefined} /><p className="mt-4 text-[10px] leading-6 text-fg-muted">This is your saved GW{gameweek} selection. Make changes to your starting XI on the official FPL website.</p><a href="https://fantasy.premierleague.com/my-team" target="_blank" rel="noreferrer" className="text-link mt-1">Manage team on FPL ↗</a></div>
       <div className="flex min-w-0 flex-col gap-5">

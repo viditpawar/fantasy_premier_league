@@ -110,6 +110,11 @@ CREATE TABLE IF NOT EXISTS player_gameweek_stats (
     PRIMARY KEY (season, player_code, gameweek)
 );
 
+-- Nullable for seasons/sources without underlying data. NULL is not zero.
+ALTER TABLE player_gameweek_stats ADD COLUMN IF NOT EXISTS expected_goals NUMERIC;
+ALTER TABLE player_gameweek_stats ADD COLUMN IF NOT EXISTS expected_assists NUMERIC;
+ALTER TABLE player_gameweek_stats ADD COLUMN IF NOT EXISTS fixture_count INT;
+
 -- `selected` holds FPL's selected_by_percent (e.g. 42.3), not a raw count —
 -- was originally INT, which truncated/rejected the decimal. v_player_season
 -- (defined further down) depends on this column, so it must be dropped first

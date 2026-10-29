@@ -3,6 +3,12 @@
 Reviewed 23 October 2026. The manual prompt/reply workflow remains in place;
 there is no paid LLM integration or website scan button.
 
+Updated 25 October: the [GW8 follow-up](gameweek-8-review.md) adds a legal-XI
+comparison over four weeks, minutes and freshness gates, double-gameweek data
+repairs, and measured ranking evaluation. It supersedes the scoring limitations
+and local connectivity findings below. The experimental ranking remains
+inactive because the observed evaluation did not show an improvement.
+
 ## Findings and changes
 
 | Area | Previous problem | Current behavior |

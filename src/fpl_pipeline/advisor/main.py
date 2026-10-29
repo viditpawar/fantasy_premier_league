@@ -12,6 +12,7 @@ import psycopg
 from fpl_pipeline.db.connection import get_connection
 
 from .context import build_context
+from .evaluation import evaluate_warehouse
 from .rules import context_fingerprint, validate_suggestion
 
 SYSTEM_PROMPT = """\
@@ -25,15 +26,25 @@ means unknown unless transfer_state explicitly reports unlimited transfers.
 The target is for_gameweek, chosen by its future deadline, not the last saved
 gameweek plus one. Use only fixtures assigned to the target and later weeks.
 Check blanks and doubles per player, not per club. Form contains only the last
-five completed calendar gameweeks; short or missing histories are uncertain.
+eight completed calendar gameweeks; short or missing histories are uncertain.
 Scores are heuristic ranking indices, NOT point forecasts, probabilities or
 evidence that a four-point hit pays off. Do not invent expected points. Keep
 hit_transfers empty because this pipeline has no calibrated points forecast.
+Check ranking_policy: the experimental underlying-data estimator is disabled
+unless it passes the historical evaluation gate. Never describe an inactive
+experimental model as a proven improvement. Explain sparse data honestly.
 
 If state is verified, use transfer_state.remaining AFTER transfers already
 made. Costs already committed are sunk; do not recommend reversing a move
 just to restore a free transfer. If remaining is zero, recommended_transfers
-must be empty. Consider rolling when all improvements are marginal. Otherwise
+must be empty. The deterministic decision block compares each move with
+rolling and selecting the best legal XI across four gameweeks. Only recommend
+pairs marked eligible in decision.transfer_options; never replace this with
+a comparison of raw form scores. If decision.action is roll, recommend no
+transfer. The horizon_gain is an index difference, never a points gain.
+Explain the opportunity cost of spending a free transfer, minutes_per_fixture,
+recent_minutes, sample_matches and concentration in a single haul. Missing xG
+is unknown, never zero. Doubles in history are normalized per fixture. Otherwise
 provide at most three independent ONE-player alternatives, ranked best first;
 they are not a multi-transfer plan. Every option must appear in candidates,
 match the outgoing position, respect three per club, and list the outgoing
@@ -41,8 +52,20 @@ player in affordable_for. Use exact web names. Doubtful is risk, not certainty
 of absence; a yellow-card warning is not a current suspension. Account for
 minutes, short samples, blank weeks and longer-term value before chasing form.
 
-Captain and vice must be different, available current starters with a target
-fixture, retained under EVERY transfer alternative. Rank captain_score with
+Use decision.lineup for the proposed legal XI and ordered bench; name any
+changes from the supplied lineup in lineup_watch. Explain these free changes
+before spending a transfer. This is the baseline before a move. Each eligible
+option supplies its own lineup AFTER that specific transfer, including
+formation, all 15 players, reserve keeper, reliable bench cover and warnings.
+Use that exact post-transfer lineup in the advice; a bench purchase can change
+the starting formation. Consider rotation, doubtful substitutes, missing
+defender cover and whether an existing bench player solves the problem for
+free. Do not treat reserve goalkeeper points as interchangeable with outfield
+points. Autosubs require zero minutes across the whole GW; a cameo blocks them.
+Small ranking differences are resolved in favour of regular minutes and usable
+bench cover, as recorded in the decision policy. Explain any bench tradeoff.
+Captain and vice must be different, available proposed starters with a target
+fixture, retained and starting under EVERY transfer alternative. Rank captain_score with
 minutes and availability; price and position do not determine the armband.
 Discuss useful bench coverage and legal formation-preserving swaps in
 lineup_watch. Bench points can count via autosubs or Bench Boost. Do not treat
@@ -148,8 +171,12 @@ def write_suggestion(context: dict, suggestion: dict) -> None:
     payload.update(
         {
             "chip_advice": context["chip_advice"],
+            "decision": context.get("decision"),
+            "ranking_policy": context.get("ranking_policy"),
             "validation": {
-                "version": 1,
+                "version": 2,
+                "model_version": context.get("model_version"),
+                "data_refreshed_at": context.get("data_refreshed_at"),
                 "state_verified": True,
                 "state_captured_at": context["state_captured_at"],
                 "transfer_state": context["transfer_state"],
@@ -198,10 +225,21 @@ def main() -> None:
         action="store_true",
         help="With --apply, validate without saving to the database.",
     )
+    parser.add_argument(
+        "--evaluate", action="store_true",
+        help="Read-only walk-forward ranking comparison on completed gameweeks.",
+    )
     args = parser.parse_args()
+    if args.evaluate and (args.state or args.apply or args.check):
+        parser.error("--evaluate cannot be combined with --state, --apply or --check")
     if args.check and not args.apply:
         parser.error("--check requires --apply FILE")
     try:
+        if args.evaluate:
+            with get_connection() as conn:
+                conn.read_only = True
+                print(json.dumps(evaluate_warehouse(conn), indent=2, default=str))
+            return
         state = (
             json.loads(Path(args.state).read_text(encoding="utf-8-sig"))
             if args.state

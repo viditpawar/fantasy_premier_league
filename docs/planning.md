@@ -3,6 +3,48 @@
 The watchlist, transfer planner and squad outlook complement the saved advisor
 recommendations. They do not call an LLM or execute changes on FPL.
 
+## Gameweek HQ and lineup studio
+
+`/gameweek` brings the next future deadline, a five-part preparation checklist,
+availability flags and a 4,000-character notebook into one page. Checks and
+notes save locally per season, manager and gameweek; the overview shares the
+same checklist. Calendar export downloads a UTC `.ics` deadline event with a
+two-hour reminder. Import it in your calendar to activate the reminder.
+
+`/lineup` drafts from all 15 players in the latest locked squad. Select a
+starter, then a substitute; a swap must preserve a legal formation. Captain
+and vice must be different starters. You can reorder the three outfield
+substitutes, while the reserve goalkeeper remains separate. Drafts save on
+this device and can be printed or exported as lineup JSON.
+
+The autosub rehearsal uses hypothetical full-gameweek minutes, defaulting to
+90 until you choose zero or a cameo. Goalkeeper substitutions, outfield bench
+priority, minimum positional requirements, multiple absences and captain
+fallback are respected. Any minutes in any game of a double prevent an
+automatic substitution. Bench Boost and Triple Captain modes are scenarios;
+they do not verify chip availability or apply a chip to your account.
+
+The suggested-XI button uses an explicitly heuristic shortlist index based on
+observed points, minutes, availability and fixtures. It is not the Python
+advisor or a calibrated points forecast. Its export is a local lineup draft,
+not an advisor-compatible current-state snapshot with confirmed selling values.
+
+## Research lab and workspace backups
+
+`/lab` adds screening presets, budget/minutes/ownership/club filters, a captain
+shortlist for owned players, 3/5/8-week fixture windows, six-week fixture-swing
+comparisons, CSV export and up to eight named research views. The watchlist
+and four-player comparison selection are shared with the existing explorer.
+Captain research includes saved substitutes and marks them accordingly; a
+player must enter the starting XI before receiving an armband.
+
+Settings can export and restore recognized local workspace keys. Backups
+preserve their original season/manager/gameweek scope and include drafts,
+research views, checks, notes and shortlists. Restore previews the item count,
+replaces matching entries and retains unrelated browser data. Only bounded,
+valid JSON backups are accepted. Files are processed locally; no FPL transfer
+or lineup action is executed.
+
 ## Watchlist and player explorer
 
 Save a player using the star in the explorer or player profile. The watchlist
