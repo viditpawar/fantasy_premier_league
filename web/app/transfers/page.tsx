@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getWorkspace } from "@/lib/workspace";
-import { getAdvisorSuggestion, getPlayers } from "@/lib/queries";
+import { getAdvisorSuggestion, getPlanningGameweek, getPlayers } from "@/lib/queries";
 import { Hero } from "@/components/ui/Hero";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SectionHeader } from "@/components/ui/SectionHeader";
@@ -11,17 +11,27 @@ import { ChipStrategy } from "@/components/ChipStrategy";
 import { PlayerKit } from "@/components/PlayerKit";
 import { FDRCell } from "@/components/ui/FDRCell";
 import { IconAlertTriangle, IconArrowRight, IconSparkles, IconStar } from "@/components/icons";
+import { GW9TransferPlan } from "@/components/GW9TransferPlan";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "AI advisor" };
 export default async function TransfersPage() {
   const { sb, season, teamId } = await getWorkspace();
-  const [suggestion, players] = await Promise.all([getAdvisorSuggestion(sb, teamId, season), getPlayers(sb, season, new Set(), { withFixtures: true })]);
+  const [suggestion, players, planningGameweek] = await Promise.all([
+    getAdvisorSuggestion(sb, teamId, season),
+    getPlayers(sb, season, new Set(), { withFixtures: true }),
+    getPlanningGameweek(sb, season),
+  ]);
+  const showGw9Plan = teamId === 6540506 && season === "2026-27" && planningGameweek === 9 && !suggestion?.isCurrent;
+  const deadlineResult = showGw9Plan
+    ? await sb.from("gameweeks").select("deadline_time").eq("season", season).eq("id", 9).maybeSingle()
+    : null;
+  if (deadlineResult?.error) throw deadlineResult.error;
   const byName = new Map(players.map((p) => [p.player.toLowerCase(), p]));
   const captain = suggestion ? byName.get(suggestion.captain.toLowerCase()) : null;
   return <main className="page-container animate-fade-in">
-    <Hero title="Your next move, considered." eyebrow={suggestion ? `Your AI advisor · GW${suggestion.forGameweek}` : "Your AI advisor"} icon={<IconSparkles />} subtitle="A thoughtful second opinion. Grounded in your squad, recent form and the fixtures ahead." stats={suggestion ? [{ label: "Free transfers in this snapshot", value: suggestion.unlimitedTransfers ? "Unlimited" : suggestion.freeTransfers ?? "Unconfirmed", accent: true }, { label: "Transfer ideas", value: suggestion.recommendedTransfers.length }, { label: "Captain pick", value: suggestion.captain }] : undefined} />
-    {!suggestion ? <EmptyState title="Your next insight is on its way.">Your advice will appear here when it’s available. Until then, form and fixtures are a good place to start.<div className="mt-5 flex justify-center gap-5"><Link href="/players" className="text-link">Explore players<IconArrowRight /></Link><Link href="/fixtures" className="text-link">Look ahead<IconArrowRight /></Link></div></EmptyState> : <>
+    <Hero title="Your next move, considered." eyebrow={showGw9Plan ? "Your GW9 game plan" : suggestion ? `Your AI advisor · GW${suggestion.forGameweek}` : "Your AI advisor"} icon={<IconSparkles />} subtitle="A thoughtful second opinion. Grounded in your squad, recent form and the fixtures ahead." stats={showGw9Plan ? [{ label: "Free transfers", value: 1, accent: true }, { label: "Bank after Neto", value: "£2.8m" }, { label: "Chip call", value: "Save all four" }] : suggestion ? [{ label: "Free transfers in this snapshot", value: suggestion.unlimitedTransfers ? "Unlimited" : suggestion.freeTransfers ?? "Unconfirmed", accent: true }, { label: "Transfer ideas", value: suggestion.recommendedTransfers.length }, { label: "Captain pick", value: suggestion.captain }] : undefined} />
+    {showGw9Plan ? <GW9TransferPlan deadline={deadlineResult?.data?.deadline_time ?? null} /> : !suggestion ? <EmptyState title="Your next insight is on its way.">Your advice will appear here when it’s available. Until then, form and fixtures are a good place to start.<div className="mt-5 flex justify-center gap-5"><Link href="/players" className="text-link">Explore players<IconArrowRight /></Link><Link href="/fixtures" className="text-link">Look ahead<IconArrowRight /></Link></div></EmptyState> : <>
       {suggestion.reviewNote && <p role="status" className="mb-7 rounded-2xl border border-warning/20 bg-warning/5 px-6 py-5 text-[12px] leading-6 text-fg-muted">{suggestion.reviewNote}</p>}
       {suggestion.decision && <AdvisorEvidence decision={suggestion.decision} players={players} transfers={suggestion.recommendedTransfers} />}
       <section className="mb-7 rounded-2xl border border-accent/15 bg-accent/5 px-6 py-5"><div className="mb-2 flex items-center gap-2 text-[10px] font-medium text-accent"><IconSparkles className="h-3.5 w-3.5" />THE THINKING BEHIND THE PICKS</div><p className="text-[13px] leading-7 text-fg-muted">{suggestion.summary}</p></section>
