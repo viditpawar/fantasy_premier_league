@@ -368,6 +368,31 @@ def next_gameweek(conn, season: str) -> int | None:
     return row[0] if row else None
 
 
+def published_is_current(conn) -> tuple[bool, str]:
+    """Whether the published run already covers the latest finished gameweek
+    and the next deadline, so a scheduled retrain can be skipped."""
+    season = conn.execute("select max(season) from gameweeks").fetchone()[0]
+    latest = conn.execute(
+        "select max(id) from gameweeks where season = %s and finished", (season,)
+    ).fetchone()[0]
+    target = next_gameweek(conn, season)
+    run = conn.execute(
+        "select model_version, trained_through, from_gameweek from prediction_runs"
+        " where season = %s",
+        (season,),
+    ).fetchone()
+    if run is None:
+        return False, "no published run"
+    version, trained_through, from_gameweek = run
+    if version != LEARNED_VERSION:
+        return False, f"published by {version}"
+    if trained_through != latest:
+        return False, f"trained through GW{trained_through}, GW{latest} has finished"
+    if from_gameweek != target:
+        return False, f"published from GW{from_gameweek}, next deadline is GW{target}"
+    return True, f"already trained through GW{latest} and published from GW{target}"
+
+
 def publish(conn, bundle: dict, horizon: int = PUBLISH_HORIZON) -> dict:
     """Write upcoming predictions for the web app and advisor; gate-checked.
 

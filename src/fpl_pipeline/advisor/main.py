@@ -242,20 +242,29 @@ def main() -> None:
         "--no-publish", action="store_true",
         help="With --train, save the model locally without writing predictions to the warehouse.",
     )
+    parser.add_argument(
+        "--if-stale", action="store_true",
+        help="With --train, skip when published predictions already cover the latest finished gameweek and next deadline.",
+    )
     args = parser.parse_args()
     if args.evaluate and (args.state or args.apply or args.check):
         parser.error("--evaluate cannot be combined with --state, --apply or --check")
-    if args.no_publish and not args.train:
-        parser.error("--no-publish requires --train")
+    if (args.no_publish or args.if_stale) and not args.train:
+        parser.error("--no-publish and --if-stale require --train")
     if args.train and (args.evaluate or args.state or args.apply or args.check):
         parser.error("--train cannot be combined with other options")
     if args.check and not args.apply:
         parser.error("--check requires --apply FILE")
     try:
         if args.train:
-            from .learned import publish, summary, train
+            from .learned import publish, published_is_current, summary, train
 
             with get_connection() as conn:
+                if args.if_stale:
+                    current, reason = published_is_current(conn)
+                    print(f"Published predictions: {reason}.")
+                    if current:
+                        return
                 bundle = train(conn)
                 report = bundle["report"]
                 published = None if args.no_publish else publish(conn, bundle)

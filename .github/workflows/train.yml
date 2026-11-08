@@ -3,7 +3,14 @@ name: Train points model
 # Retrain on every finished gameweek, re-run the evaluation gate and publish
 # the next six gameweeks of predictions for the web app and advisor. A model
 # that fails the gate clears published predictions instead.
+#
+# Runs after each successful ingest, but only retrains when a gameweek has
+# newly finished or the next deadline changed (--if-stale). The daily
+# schedule is a fallback; manual runs always retrain.
 on:
+  workflow_run:
+    workflows: ["Live ingest"]
+    types: [completed]
   schedule:
     - cron: "30 5 * * *"
   workflow_dispatch: {}
@@ -13,6 +20,7 @@ permissions:
 
 jobs:
   train:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     concurrency:
       group: fpl-train
       cancel-in-progress: false
@@ -27,4 +35,5 @@ jobs:
       - name: Train, evaluate and publish
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: python -m fpl_pipeline.advisor --train
+          IF_STALE: ${{ github.event_name == 'workflow_dispatch' && '' || '--if-stale' }}
+        run: python -m fpl_pipeline.advisor --train $IF_STALE
