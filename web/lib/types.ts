@@ -98,6 +98,8 @@ export interface AdvisorSuggestion {
 
 export interface AdvisorDecision {
   model_version: string;
+  /** "learned predicted points…" when the trained model passed its gate; otherwise a heuristic index. */
+  score_units?: string;
   horizon: number;
   action: "roll" | "consider_transfer";
   reason: string;
