@@ -236,23 +236,34 @@ def main() -> None:
     )
     parser.add_argument(
         "--train", action="store_true",
-        help="Train, evaluate and save the learned points model (needs the ml extra).",
+        help="Train, evaluate and save the learned points model (needs the ml extra), then publish upcoming predictions.",
+    )
+    parser.add_argument(
+        "--no-publish", action="store_true",
+        help="With --train, save the model locally without writing predictions to the warehouse.",
     )
     args = parser.parse_args()
     if args.evaluate and (args.state or args.apply or args.check):
         parser.error("--evaluate cannot be combined with --state, --apply or --check")
+    if args.no_publish and not args.train:
+        parser.error("--no-publish requires --train")
     if args.train and (args.evaluate or args.state or args.apply or args.check):
         parser.error("--train cannot be combined with other options")
     if args.check and not args.apply:
         parser.error("--check requires --apply FILE")
     try:
         if args.train:
-            from .learned import summary, train
+            from .learned import publish, summary, train
 
             with get_connection() as conn:
-                conn.read_only = True
-                report = train(conn)
+                bundle = train(conn)
+                report = bundle["report"]
+                published = None if args.no_publish else publish(conn, bundle)
             print(json.dumps(summary(report), indent=2))
+            if published and published["rows"]:
+                print(
+                    f"Published {published['rows']} predictions from GW{published['from_gameweek']}."
+                )
             print(
                 "Learned model "
                 + ("PASSED" if report["gate"]["passed"] else "did not pass")

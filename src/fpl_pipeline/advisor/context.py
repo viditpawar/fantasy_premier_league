@@ -9,7 +9,7 @@ from psycopg.rows import dict_row
 from fpl_pipeline.config import FPL_TEAM_ID
 
 from .evaluation import evaluate_warehouse, ranking_policy
-from .learned import LEARNED_VERSION, load_active, predict_upcoming
+from .learned import LEARNED_VERSION, load_active, load_published, predict_upcoming
 from .model import MODEL_VERSION, apply_ranking_policy, decision_context, week_score
 from .rules import (
     CHIPS,
@@ -370,10 +370,19 @@ def build_context(
         "select max(id) from gameweeks where season = %s and finished = true",
         (season,),
     ).fetchone()[0]
+    horizon = min(4, 39 - target)
+    # Prefer a fresh local model; otherwise the predictions the scheduled
+    # training job published (both passed the same gate).
     bundle, learned_status = load_active(season, latest_finished)
-    predictions = {}
     if bundle is not None:
-        predictions = predict_upcoming(conn, bundle, season, target, min(4, 39 - target))
+        predictions = predict_upcoming(conn, bundle, season, target, horizon)
+    else:
+        predictions, published = load_published(
+            conn, season, target, horizon, latest_finished
+        )
+        if published["status"] != "absent" or learned_status["status"] == "absent":
+            learned_status = published
+    if predictions:
         policy = {
             **policy,
             "selected": "learned",

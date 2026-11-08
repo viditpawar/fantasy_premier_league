@@ -1,0 +1,30 @@
+name: Train points model
+
+# Retrain on every finished gameweek, re-run the evaluation gate and publish
+# the next six gameweeks of predictions for the web app and advisor. A model
+# that fails the gate clears published predictions instead.
+on:
+  schedule:
+    - cron: "30 5 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  train:
+    concurrency:
+      group: fpl-train
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[ml]"
+      - name: Train, evaluate and publish
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python -m fpl_pipeline.advisor --train

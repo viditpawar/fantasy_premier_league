@@ -207,11 +207,11 @@ python -m fpl_pipeline.advisor --evaluate
 
 ### The learned points model
 
-An optional trained model can replace the rule-based ranking. Two gradient-boosted models (scikit-learn) predict **points per fixture** and the **chance of 60+ minutes** from recent minutes, points, bonus, ICT, xG/xA, price, last season's output and fixture context (home/away, difficulty, both clubs' recent goals). Every input is computed only from gameweeks before the one being predicted; live injury status and news are deliberately excluded and applied afterwards as an availability multiplier.
+An optional trained model can replace the rule-based ranking. Two gradient-boosted models (scikit-learn) predict **points per fixture** and the **chance of 60+ minutes** from recent and longer-run minutes, starts, points, bonus, BPS, ICT, threat, creativity, saves, xG/xA, the player's share of club xG, price, last season's output and fixture context (home/away, difficulty, both clubs' recent goals, xG for/against and clean sheets). Every input is computed only from gameweeks before the one being predicted; live injury status and news are deliberately excluded and applied afterwards as an availability multiplier.
 
 ```powershell
 pip install -e ".[ml]"
-python -m fpl_pipeline.advisor --train   # read-only on the warehouse; about a minute
+python -m fpl_pipeline.advisor --train   # about a minute; add --no-publish to keep it local
 ```
 
 `--train` needs at least two completed seasons (run the historical backfill first). It then:
@@ -219,9 +219,14 @@ python -m fpl_pipeline.advisor --train   # read-only on the warehouse; about a m
 1. trains on earlier seasons and tests on the **last completed season**, held out entirely;
 2. retrains before **each finished week of the current season** and tests on that week;
 3. compares top-five picks per position against the form ranking on the same player pool, and prediction error against a last-five-games average;
-4. fits the final model on everything and saves it with its report under `data/models/` (git-ignored; `FPL_MODEL_DIR` overrides).
+4. fits the final model on everything and saves it with its report under `data/models/` (git-ignored; `FPL_MODEL_DIR` overrides);
+5. publishes the next six gameweeks of predictions to `player_predictions`, with the run and gate result in `prediction_runs`. A failing model clears them instead.
 
-The advisor uses the model only if it passed this gate: at least 30 held-out weeks with a lift of **≥ 0.15 points per pick**, lower prediction error than the naive average, and at least six current-season weeks with **no regression**. A model trained for another season or more than two gameweeks out of date is ignored with a warning. When active, `ranking_policy.selected` is `learned`, scores become predicted points per gameweek (doubles summed, blanks zero) and each player shows `performance.p60`. All legality, bench-cover and validation checks are unchanged. Retrain weekly after the gameweek's data is ingested.
+The model is used only if it passed this gate: at least 30 held-out weeks with a lift of **≥ 0.15 points per pick**, lower prediction error than the naive average, and at least six current-season weeks with **no regression**. A model trained for another season or more than two gameweeks out of date is ignored with a warning. When active, `ranking_policy.selected` is `learned`, scores become predicted points per gameweek (doubles summed, blanks zero) and each player shows `performance.p60`. All legality, bench-cover and validation checks are unchanged. The advisor prefers a fresh local model and otherwise reads the published predictions.
+
+The **Train points model** workflow retrains and publishes daily (05:30 UTC, or run it manually) using the same `DATABASE_URL` secret as the ingest. The lineup studio's *Suggest XI* and the research lab's captain shortlist then use published predictions, scaled by current availability, and fall back to their observed-points index when no passing run is published.
+
+Model settings were chosen on 2024-25 (trained on 2021-22 to 2023-24) and confirmed once on untouched 2025-26: shallow, heavily regularized trees generalized best because FPL points are noisy. Prices are model inputs, so the live ingest keeps each gameweek's first recorded price and backfills missing ones from each player's FPL history.
 
 The [advisor audit](docs/advisor-audit.md) documents the state format. The [GW8 investigation](docs/gameweek-8-review.md) explains the model checks, measured limitations and bench-review fixes.
 

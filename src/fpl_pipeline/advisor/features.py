@@ -9,7 +9,7 @@ the historical rows cannot reproduce. Availability is applied after prediction.
 """
 
 from collections import defaultdict
-from math import nan
+from math import isnan, nan
 
 from psycopg.rows import dict_row
 
@@ -17,7 +17,7 @@ from .rules import POSITIONS
 
 POSITION_CODES = {"GKP": 0, "DEF": 1, "MID": 2, "FWD": 3}
 
-FEATURES = [
+PLAYER_FEATURES = [
     "position",
     "gameweek",
     "price",
@@ -25,25 +25,43 @@ FEATURES = [
     "minutes_last",
     "minutes_3",
     "minutes_5",
+    "minutes_10",
     "starts_5",
+    "starts_season",
     "points_3",
     "points_5",
+    "points_10",
     "points_season",
+    "bonus_5",
     "bps_5",
     "ict_5",
+    "threat_5",
+    "creativity_5",
+    "saves_5",
     "goal_involvements_5",
     "xg_5",
     "xa_5",
+    "xg_10",
+    "xa_10",
     "xgi_per90_5",
     "prev_points_per_fixture",
     "prev_minutes_share",
+]
+FIXTURE_FEATURES = [
     "was_home",
     "difficulty",
     "team_scored_5",
     "team_conceded_5",
+    "team_clean_sheets_5",
+    "team_xg_5",
+    "team_xga_5",
     "opponent_scored_5",
     "opponent_conceded_5",
+    "opponent_clean_sheets_5",
+    "opponent_xg_5",
+    "opponent_xga_5",
 ]
+FEATURES = [*PLAYER_FEATURES, *FIXTURE_FEATURES, "xg_share_5"]
 CATEGORICAL = ["position"]
 
 
@@ -51,14 +69,24 @@ def _num(value) -> float:
     return nan if value is None else float(value)
 
 
-def _window(rows: list[dict], n: int) -> list[dict]:
-    return rows[-n:]
-
-
 def _per_fixture(rows: list[dict], key: str) -> float:
     if not rows or any(r.get(key) is None for r in rows):
         return nan
     return sum(float(r[key]) for r in rows) / sum(r["fixture_count"] for r in rows)
+
+
+def _starts(rows: list[dict]) -> float:
+    if not rows:
+        return nan
+    return sum(r["minutes"] / r["fixture_count"] >= 60 for r in rows) / len(rows)
+
+
+def _xg(rows: list[dict]) -> list[dict]:
+    return [
+        r
+        for r in rows
+        if r.get("expected_goals") is not None and r.get("expected_assists") is not None
+    ]
 
 
 def history_features(
@@ -70,37 +98,38 @@ def history_features(
 ) -> dict:
     """Player form from strictly earlier played gameweeks (oldest first)."""
     prior = [r for r in prior if r["fixture_count"] > 0 and r["gameweek"] < gameweek]
-    last5 = _window(prior, 5)
-    with_xg = [
-        r
-        for r in last5
-        if r.get("expected_goals") is not None and r.get("expected_assists") is not None
-    ]
-    xg_minutes = sum(r["minutes"] for r in with_xg)
+    last3, last5, last10 = prior[-3:], prior[-5:], prior[-10:]
+    xg5 = _xg(last5)
+    xg_minutes = sum(r["minutes"] for r in xg5)
     return {
         "position": POSITION_CODES[position],
         "gameweek": gameweek,
         "price": _num(price),
         "prior_fixtures": sum(r["fixture_count"] for r in prior),
         "minutes_last": _per_fixture(prior[-1:], "minutes"),
-        "minutes_3": _per_fixture(_window(prior, 3), "minutes"),
+        "minutes_3": _per_fixture(last3, "minutes"),
         "minutes_5": _per_fixture(last5, "minutes"),
-        "starts_5": sum(r["minutes"] / r["fixture_count"] >= 60 for r in last5) / len(last5)
-        if last5
-        else nan,
-        "points_3": _per_fixture(_window(prior, 3), "total_points"),
+        "minutes_10": _per_fixture(last10, "minutes"),
+        "starts_5": _starts(last5),
+        "starts_season": _starts(prior),
+        "points_3": _per_fixture(last3, "total_points"),
         "points_5": _per_fixture(last5, "total_points"),
+        "points_10": _per_fixture(last10, "total_points"),
         "points_season": _per_fixture(prior, "total_points"),
+        "bonus_5": _per_fixture(last5, "bonus"),
         "bps_5": _per_fixture(last5, "bps"),
         "ict_5": _per_fixture(last5, "ict_index"),
+        "threat_5": _per_fixture(last5, "threat"),
+        "creativity_5": _per_fixture(last5, "creativity"),
+        "saves_5": _per_fixture(last5, "saves"),
         "goal_involvements_5": (
             _per_fixture(last5, "goals_scored") + _per_fixture(last5, "assists")
         ),
-        "xg_5": _per_fixture(with_xg, "expected_goals"),
-        "xa_5": _per_fixture(with_xg, "expected_assists"),
-        "xgi_per90_5": sum(
-            float(r["expected_goals"]) + float(r["expected_assists"]) for r in with_xg
-        )
+        "xg_5": _per_fixture(xg5, "expected_goals"),
+        "xa_5": _per_fixture(xg5, "expected_assists"),
+        "xg_10": _per_fixture(_xg(last10), "expected_goals"),
+        "xa_10": _per_fixture(_xg(last10), "expected_assists"),
+        "xgi_per90_5": sum(r["expected_goals"] + r["expected_assists"] for r in xg5)
         * 90
         / xg_minutes
         if xg_minutes
@@ -129,10 +158,37 @@ def previous_summaries(rows: list[dict]) -> dict[int, dict]:
     }
 
 
-class TeamForm:
-    """Rolling goals for/against from fixtures finished before a gameweek."""
+def row_team(row: dict, by_fixture: dict) -> int:
+    """Archive rows carry the player's final club; a single fixture's home
+    flag identifies the club on the day."""
+    single = by_fixture.get(row.get("fixture_id"))
+    if single is not None and row.get("was_home") is not None:
+        return single["team_h"] if row["was_home"] else single["team_a"]
+    return row["team_id"]
 
-    def __init__(self, fixtures: list[dict]):
+
+def _mean(values: list[float]) -> float:
+    values = [v for v in values if not isnan(v)]
+    return sum(values) / len(values) if values else nan
+
+
+class TeamForm:
+    """Rolling club results and xG from fixtures finished before a gameweek.
+
+    Club xG is the sum of its players' xG in single-fixture rows; fixtures
+    without it (doubles, seasons before xG) contribute only goals.
+    """
+
+    def __init__(self, fixtures: list[dict], rows: list[dict] | None = None):
+        by_fixture = {f["id"]: f for f in fixtures if f.get("id") is not None}
+        xg = defaultdict(float)
+        for r in rows or []:
+            if (
+                r["fixture_count"] == 1
+                and r.get("fixture_id") in by_fixture
+                and r.get("expected_goals") is not None
+            ):
+                xg[r["fixture_id"], row_team(r, by_fixture)] += r["expected_goals"]
         self.results = defaultdict(list)
         for f in fixtures:
             if (
@@ -140,45 +196,65 @@ class TeamForm:
                 and f.get("gameweek") is not None
                 and f.get("team_h_score") is not None
             ):
-                self.results[f["team_h"]].append(
-                    (f["gameweek"], f["team_h_score"], f["team_a_score"])
+                home, away = f["team_h"], f["team_a"]
+                known = (f["id"], home) in xg and (f["id"], away) in xg
+                hxg = xg[f["id"], home] if known else nan
+                axg = xg[f["id"], away] if known else nan
+                self.results[home].append(
+                    (f["gameweek"], f["team_h_score"], f["team_a_score"], hxg, axg)
                 )
-                self.results[f["team_a"]].append(
-                    (f["gameweek"], f["team_a_score"], f["team_h_score"])
+                self.results[away].append(
+                    (f["gameweek"], f["team_a_score"], f["team_h_score"], axg, hxg)
                 )
         for games in self.results.values():
-            games.sort()
+            games.sort(key=lambda g: g[0])
 
-    def before(self, team: int, gameweek: int) -> tuple[float, float]:
+    def before(self, team: int, gameweek: int) -> dict:
         games = [g for g in self.results.get(team, []) if g[0] < gameweek][-5:]
         if not games:
-            return nan, nan
-        return (
-            sum(g[1] for g in games) / len(games),
-            sum(g[2] for g in games) / len(games),
-        )
+            return {k: nan for k in ("scored", "conceded", "clean_sheets", "xg", "xga")}
+        return {
+            "scored": _mean([g[1] for g in games]),
+            "conceded": _mean([g[2] for g in games]),
+            "clean_sheets": _mean([float(g[2] == 0) for g in games]),
+            "xg": _mean([g[3] for g in games]),
+            "xga": _mean([g[4] for g in games]),
+        }
 
 
-def fixture_features(fixture: dict, team: int, form: TeamForm) -> dict:
-    """One fixture from the player's team's perspective."""
+def fixture_features(fixture: dict, team: int, form: TeamForm, as_of: int | None = None) -> dict:
+    """One fixture from the player's team's perspective, using results
+    before `as_of` (default: the fixture's own gameweek)."""
     home = fixture["team_h"] == team
     opponent = fixture["team_a"] if home else fixture["team_h"]
-    gameweek = fixture["gameweek"]
-    scored, conceded = form.before(team, gameweek)
-    opp_scored, opp_conceded = form.before(opponent, gameweek)
+    cutoff = as_of if as_of is not None else fixture["gameweek"]
+    own, opp = form.before(team, cutoff), form.before(opponent, cutoff)
     return {
         "was_home": float(home),
         "difficulty": _num(fixture.get("team_h_difficulty" if home else "team_a_difficulty")),
-        "team_scored_5": scored,
-        "team_conceded_5": conceded,
-        "opponent_scored_5": opp_scored,
-        "opponent_conceded_5": opp_conceded,
+        "team_scored_5": own["scored"],
+        "team_conceded_5": own["conceded"],
+        "team_clean_sheets_5": own["clean_sheets"],
+        "team_xg_5": own["xg"],
+        "team_xga_5": own["xga"],
+        "opponent_scored_5": opp["scored"],
+        "opponent_conceded_5": opp["conceded"],
+        "opponent_clean_sheets_5": opp["clean_sheets"],
+        "opponent_xg_5": opp["xg"],
+        "opponent_xga_5": opp["xga"],
     }
 
 
-def _mean_fixture(features: list[dict]) -> dict:
-    keys = features[0].keys()
-    return {k: sum(f[k] for f in features) / len(features) for k in keys}
+def combine(player: dict, fixtures: list[dict]) -> dict:
+    """Player features plus the mean of a gameweek's fixture features."""
+    combined = dict(player)
+    for key in FIXTURE_FEATURES:
+        combined[key] = sum(f[key] for f in fixtures) / len(fixtures)
+    team_xg = combined["team_xg_5"]
+    combined["xg_share_5"] = (
+        player["xg_5"] / team_xg if team_xg and not isnan(team_xg) else nan
+    )
+    return combined
 
 
 def build_examples(
@@ -192,7 +268,7 @@ def build_examples(
     no example can see its own gameweek or anything later.
     """
     previous = previous or {}
-    form = TeamForm(fixtures)
+    form = TeamForm(fixtures, rows)
     by_fixture = {f["id"]: f for f in fixtures if f.get("id") is not None}
     by_team_week = defaultdict(list)
     for f in fixtures:
@@ -208,24 +284,19 @@ def build_examples(
         history = []
         for r in player_rows:
             if r["fixture_count"] > 0:
-                team = r["team_id"]
-                single = by_fixture.get(r.get("fixture_id"))
-                # Archive rows carry the player's final club; a single
-                # fixture's home flag identifies the club on the day.
-                if single is not None and r.get("was_home") is not None:
-                    team = single["team_h"] if r["was_home"] else single["team_a"]
+                team = row_team(r, by_fixture)
                 week = by_team_week.get((team, r["gameweek"]), [])
                 if week:
                     value = r.get("value")
-                    example = history_features(
-                        history,
-                        r["position"],
-                        r["gameweek"],
-                        value / 10 if value is not None else None,
-                        previous.get(code),
-                    )
-                    example.update(
-                        _mean_fixture([fixture_features(f, team, form) for f in week])
+                    example = combine(
+                        history_features(
+                            history,
+                            r["position"],
+                            r["gameweek"],
+                            value / 10 if value is not None else None,
+                            previous.get(code),
+                        ),
+                        [fixture_features(f, team, form) for f in week],
                     )
                     example.update(
                         {
@@ -243,7 +314,8 @@ def build_examples(
 STATS_QUERY = """
     select s.season, s.player_code, s.gameweek, s.team_id, s.fixture_id,
         s.was_home, s.minutes, s.total_points, s.goals_scored, s.assists,
-        s.expected_goals, s.expected_assists, s.bps, s.ict_index, s.value,
+        s.expected_goals, s.expected_assists, s.bps, s.bonus, s.saves,
+        s.ict_index, s.threat, s.creativity, s.value,
         coalesce(s.fixture_count, (select count(*) from fixtures f
             where f.season = s.season and f.gameweek = s.gameweek
             and s.team_id in (f.team_h, f.team_a))) as fixture_count,
@@ -262,6 +334,8 @@ FIXTURES_QUERY = """
     from fixtures where season = %s
 """
 
+NUMERIC = ("expected_goals", "expected_assists", "ict_index", "threat", "creativity")
+
 
 def load_season(conn, season: str) -> tuple[list[dict], list[dict]]:
     with conn.cursor(row_factory=dict_row) as cur:
@@ -271,7 +345,7 @@ def load_season(conn, season: str) -> tuple[list[dict], list[dict]]:
         fixtures = cur.fetchall()
     for r in rows:
         r["position"] = POSITIONS[r.pop("element_type")]
-        for key in ("expected_goals", "expected_assists", "ict_index"):
+        for key in NUMERIC:
             if r[key] is not None:
                 r[key] = float(r[key])
     return rows, fixtures
@@ -286,17 +360,27 @@ def seasons(conn) -> list[str]:
     ]
 
 
-def load_dataset(conn) -> dict:
-    """Examples for every stored season, each primed by the season before."""
+def load_raw(conn) -> dict:
+    """Rows and fixtures for every stored season."""
     data = {}
-    previous = {}
     for season in seasons(conn):
         rows, fixtures = load_season(conn, season)
-        data[season] = {
-            "rows": rows,
-            "fixtures": fixtures,
-            "previous": previous,
-            "examples": build_examples(rows, fixtures, previous),
-        }
-        previous = previous_summaries(rows)
+        data[season] = {"rows": rows, "fixtures": fixtures}
     return data
+
+
+def prepare(raw: dict) -> dict:
+    """Add examples to raw season data, each season primed by the one before."""
+    previous = {}
+    for season in sorted(raw):
+        season_data = raw[season]
+        season_data["previous"] = previous
+        season_data["examples"] = build_examples(
+            season_data["rows"], season_data["fixtures"], previous
+        )
+        previous = previous_summaries(season_data["rows"])
+    return raw
+
+
+def load_dataset(conn) -> dict:
+    return prepare(load_raw(conn))

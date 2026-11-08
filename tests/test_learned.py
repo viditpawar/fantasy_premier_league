@@ -246,3 +246,68 @@ def test_ranking_scorer_replaces_new_rating_on_the_same_pool():
     assert sorted(week5["model_picks"]) == [8, 9, 10, 11, 12]
     skipped = evaluate_rankings(rows, scorer=lambda row, _p: None)
     assert skipped["weeks"] == []
+
+
+class FakeResult:
+    def __init__(self, one=None, rows=()):
+        self.one, self.rows = one, list(rows)
+
+    def fetchone(self):
+        return self.one
+
+    def fetchall(self):
+        return self.rows
+
+
+class FakeConn:
+    """Answers the two prediction queries load_published issues."""
+
+    def __init__(self, run, rows):
+        self.run, self.rows = run, rows
+
+    def execute(self, sql, params=()):
+        if "from prediction_runs" in sql:
+            return FakeResult(one=self.run)
+        return FakeResult(rows=[r for r in self.rows if params[1] <= r[1] < params[2]])
+
+
+def published_run(**overrides):
+    run = {"version": learned.LEARNED_VERSION, "through": 9, "passed": True}
+    run.update(overrides)
+    return (run["version"], run["through"], run["passed"], {"gate": {"passed": run["passed"]}})
+
+
+def test_published_predictions_fill_blank_weeks_and_respect_the_gate():
+    rows = [(7, 11, 5.5, 0.9), (7, 12, 4.0, 0.8), (8, 11, 2.0, None)]
+    predictions, status = learned.load_published(FakeConn(published_run(), rows), "2026-27", 11, 4, 10)
+    assert status["status"] == "active"
+    assert predictions[7] == {"points": {11: 5.5, 12: 4.0, 13: 0.0, 14: 0.0}, "p60": 0.9}
+    assert predictions[8]["p60"] is None
+    for run, reason in [
+        (published_run(passed=False), "gate"),
+        (published_run(through=6), "old"),
+        (published_run(version="learned-hgb-v0"), "different model"),
+    ]:
+        predictions, status = learned.load_published(FakeConn(run, rows), "2026-27", 11, 4, 10)
+        assert predictions == {} and reason in status["reason"]
+    assert learned.load_published(FakeConn(None, rows), "2026-27", 11, 4, 10)[1]["status"] == "absent"
+    missing = learned.load_published(FakeConn(published_run(), rows), "2026-27", 13, 4, 10)
+    assert missing[0] == {} and "GW13" in missing[1]["reason"]
+
+
+def test_upcoming_examples_freeze_form_at_the_deadline():
+    rows, fixtures = season_data(weeks=8, players=8)
+    for f in fixtures:
+        if f["gameweek"] >= 6:
+            f.update(finished=False, team_h_score=None, team_a_score=None)
+    players = [{"code": c, "team_id": TEAMS[c % 4], "element_type": c % 4 + 1, "now_cost": 60} for c in range(1, 9)]
+    examples, keys = learned.upcoming_examples(rows, fixtures, {}, players, 6, 3)
+    assert {gw for _, gw in keys} == {6, 7, 8}
+    by_key = dict(zip(keys, examples))
+    a, b = by_key[1, 6], by_key[1, 8]
+    assert a["points_5"] == b["points_5"] and a["price"] == 6.0
+    assert b["gameweek"] == 8
+    # Rows at or after the target (none exist pre-deadline in practice) are ignored.
+    leaked = [dict(r, total_points=99) if r["gameweek"] >= 6 else r for r in rows]
+    again = dict(zip(*reversed(learned.upcoming_examples(leaked, fixtures, {}, players, 6, 3))))
+    assert same({k: again[1, 6][k] for k in FEATURES}, {k: a[k] for k in FEATURES})

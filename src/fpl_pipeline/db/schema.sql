@@ -212,6 +212,28 @@ CREATE TABLE IF NOT EXISTS league_standings (
     PRIMARY KEY (season, league_id, entry_team_id)
 );
 
+-- Learned points model output, published by `advisor --train` only after
+-- the evaluation gate passes. Raw per-gameweek predictions (doubles summed,
+-- blanks zero) before availability; readers apply current injury status.
+CREATE TABLE IF NOT EXISTS prediction_runs (
+    season TEXT PRIMARY KEY,
+    model_version TEXT NOT NULL,
+    trained_through INT NOT NULL,
+    from_gameweek INT,
+    gate_passed BOOLEAN NOT NULL,
+    summary JSONB NOT NULL,
+    generated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS player_predictions (
+    season TEXT NOT NULL,
+    gameweek INT NOT NULL,
+    player_code INT NOT NULL,
+    predicted_points NUMERIC NOT NULL,
+    p60 NUMERIC,
+    PRIMARY KEY (season, gameweek, player_code)
+);
+
 -- Public read-only access for the frontend (Supabase anon key). The ingest
 -- job connects as the table owner, which bypasses RLS, so this only
 -- restricts anonymous/frontend access, never the pipeline itself. Only
@@ -225,13 +247,15 @@ BEGIN
     IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
         FOR t IN SELECT unnest(ARRAY['teams', 'players', 'gameweeks', 'fixtures',
             'player_gameweek_stats', 'managers', 'manager_gameweek_history', 'manager_picks',
-            'advisor_suggestions', 'manager_leagues', 'league_standings', 'data_refresh_status'])
+            'advisor_suggestions', 'manager_leagues', 'league_standings', 'data_refresh_status',
+            'prediction_runs', 'player_predictions'])
         LOOP
             EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
             EXECUTE format('DROP POLICY IF EXISTS public_read ON %I', t);
             EXECUTE format('CREATE POLICY public_read ON %I FOR SELECT TO anon USING (true)', t);
         END LOOP;
         GRANT SELECT ON data_refresh_status TO anon;
+        GRANT SELECT ON prediction_runs, player_predictions TO anon;
     END IF;
 END $$;
 

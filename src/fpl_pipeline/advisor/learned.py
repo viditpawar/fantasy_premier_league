@@ -24,6 +24,7 @@ from .features import (
     CATEGORICAL,
     FEATURES,
     TeamForm,
+    combine,
     fixture_features,
     history_features,
     load_dataset,
@@ -32,7 +33,7 @@ from .features import (
 )
 from .rules import POSITIONS
 
-LEARNED_VERSION = "learned-hgb-v1"
+LEARNED_VERSION = "learned-hgb-v2"
 ARTIFACT = "learned-points.joblib"
 REPORT = "learned-points-report.json"
 # Gate: a full held-out season must show a clear ranking lift, and the
@@ -42,11 +43,14 @@ MIN_HOLDOUT_LIFT = 0.15
 MIN_CURRENT_WEEKS = 6
 MIN_CURRENT_LIFT = 0.0
 MAX_STALE_GAMEWEEKS = 2
+# Chosen on 2024-25 validation (trained on 2021-22..2023-24), then confirmed
+# once on untouched 2025-26. Shallow, heavily regularized trees generalized
+# best: FPL points are noisy and deeper models fit noise.
 PARAMS = {
     "learning_rate": 0.05,
-    "max_iter": 300,
-    "max_leaf_nodes": 31,
-    "min_samples_leaf": 100,
+    "max_iter": 200,
+    "max_leaf_nodes": 7,
+    "min_samples_leaf": 200,
     "l2_regularization": 1.0,
     "early_stopping": False,
     "random_state": 0,
@@ -182,7 +186,7 @@ def gate(report: dict) -> dict:
     }
 
 
-def train(conn, model_dir: Path | str = MODEL_DIR) -> dict:
+def train(conn, model_dir: Path | str | None = None) -> dict:
     """Evaluate, then fit on every finished gameweek and save artifact + report."""
     import joblib
 
@@ -205,11 +209,12 @@ def train(conn, model_dir: Path | str = MODEL_DIR) -> dict:
         "params": PARAMS,
     }
     report = {**meta, **report}
-    path = Path(model_dir)
+    path = Path(model_dir or MODEL_DIR)
     path.mkdir(parents=True, exist_ok=True)
-    joblib.dump({**bundle, "meta": meta, "report": report}, path / ARTIFACT)
+    bundle = {**bundle, "meta": meta, "report": report}
+    joblib.dump(bundle, path / ARTIFACT)
     (path / REPORT).write_text(json.dumps(report, indent=2), encoding="utf-8")
-    return report
+    return bundle
 
 
 def summary(report: dict) -> dict:
@@ -267,30 +272,23 @@ def load_active(
     return None, status
 
 
-def predict_upcoming(
-    conn, bundle: dict, season: str, target: int, horizon: int
-) -> dict[int, dict]:
-    """Points per player code for each gameweek in [target, target + horizon).
+def upcoming_examples(
+    rows: list[dict],
+    fixtures: list[dict],
+    previous: dict[int, dict],
+    players: list[dict],
+    target: int,
+    horizon: int,
+) -> tuple[list[dict], list[tuple[int, int]]]:
+    """Feature rows for every player's fixtures in [target, target + horizon).
 
-    Doubles sum their fixtures; a blank gameweek is zero. Raw predictions,
-    before availability is applied by the ranking policy.
+    Form is fixed at the target deadline; later weeks change only the fixture.
     """
-    rows, fixtures = load_season(conn, season)
-    prev_season = conn.execute(
-        "select max(season) from gameweeks where season < %s", (season,)
-    ).fetchone()[0]
-    previous = previous_summaries(load_season(conn, prev_season)[0]) if prev_season else {}
-    with conn.cursor(row_factory=dict_row) as cur:
-        cur.execute(
-            "select code, team_id, element_type, now_cost from players"
-            " where season = %s and element_type between 1 and 4",
-            (season,),
-        )
-        players = cur.fetchall()
-    form = TeamForm(fixtures)
+    form = TeamForm(fixtures, rows)
     history = {}
     for r in rows:
-        history.setdefault(r["player_code"], []).append(r)
+        if r["gameweek"] < target:
+            history.setdefault(r["player_code"], []).append(r)
     upcoming = [
         f
         for f in fixtures
@@ -307,20 +305,159 @@ def predict_upcoming(
         )
         for f in upcoming:
             if p["team_id"] in (f["team_h"], f["team_a"]):
-                # Later weeks reuse current form; only the fixture changes.
-                examples.append({**base, "gameweek": f["gameweek"], **fixture_features(
-                    {**f, "gameweek": target}, p["team_id"], form
-                )})
+                example = combine(
+                    base, [fixture_features(f, p["team_id"], form, as_of=target)]
+                )
+                example["gameweek"] = f["gameweek"]
+                examples.append(example)
                 keys.append((p["code"], f["gameweek"]))
+    return examples, keys
+
+
+def load_players(conn, season: str) -> list[dict]:
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(
+            "select id, code, web_name, team_id, element_type, now_cost from players"
+            " where season = %s and element_type between 1 and 4",
+            (season,),
+        )
+        return cur.fetchall()
+
+
+def predict_upcoming(
+    conn, bundle: dict, season: str, target: int, horizon: int
+) -> dict[int, dict]:
+    """Points per player code for each gameweek in [target, target + horizon).
+
+    Doubles sum their fixtures; a blank gameweek is zero. Raw predictions,
+    before availability is applied by the ranking policy.
+    """
+    rows, fixtures = load_season(conn, season)
+    prev_season = conn.execute(
+        "select max(season) from gameweeks where season < %s", (season,)
+    ).fetchone()[0]
+    previous = previous_summaries(load_season(conn, prev_season)[0]) if prev_season else {}
+    players = load_players(conn, season)
+    examples, keys = upcoming_examples(rows, fixtures, previous, players, target, horizon)
     result = {
         p["code"]: {
             "points": {gw: 0.0 for gw in range(target, target + horizon)},
+            "p60_by_gameweek": {},
             "p60": None,
         }
         for p in players
     }
     for (code, gameweek), (points, p60) in zip(keys, predict(bundle, examples)):
         result[code]["points"][gameweek] += points
-        if gameweek == target and p60 is not None:
-            result[code]["p60"] = p60
+        if p60 is not None:
+            result[code]["p60_by_gameweek"].setdefault(gameweek, p60)
+    for row in result.values():
+        row["p60"] = row["p60_by_gameweek"].get(target)
     return result
+
+
+PUBLISH_HORIZON = 6
+
+
+def next_gameweek(conn, season: str) -> int | None:
+    row = conn.execute(
+        "select id from gameweeks where season = %s and deadline_time > now()"
+        " order by deadline_time limit 1",
+        (season,),
+    ).fetchone()
+    return row[0] if row else None
+
+
+def publish(conn, bundle: dict, horizon: int = PUBLISH_HORIZON) -> dict:
+    """Write upcoming predictions for the web app and advisor; gate-checked.
+
+    A failing model clears the season's predictions so nothing stale is shown.
+    """
+    meta, report = bundle["meta"], bundle["report"]
+    season, passed = meta["season"], report["gate"]["passed"]
+    target = next_gameweek(conn, season)
+    conn.execute("delete from player_predictions where season = %s", (season,))
+    written = 0
+    if passed and target is not None:
+        horizon = min(horizon, 39 - target)
+        predictions = predict_upcoming(conn, bundle, season, target, horizon)
+        rows = []
+        for code, row in predictions.items():
+            for gw, points in row["points"].items():
+                p60 = row["p60_by_gameweek"].get(gw)
+                rows.append(
+                    (season, gw, code, round(points, 4), None if p60 is None else round(p60, 4))
+                )
+        conn.cursor().executemany(
+            "insert into player_predictions"
+            " (season, gameweek, player_code, predicted_points, p60)"
+            " values (%s, %s, %s, %s, %s)",
+            rows,
+        )
+        written = len(rows)
+    conn.execute(
+        """
+        insert into prediction_runs (season, model_version, trained_through,
+            from_gameweek, gate_passed, summary, generated_at)
+        values (%s, %s, %s, %s, %s, %s, now())
+        on conflict (season) do update set
+            model_version = excluded.model_version,
+            trained_through = excluded.trained_through,
+            from_gameweek = excluded.from_gameweek,
+            gate_passed = excluded.gate_passed,
+            summary = excluded.summary,
+            generated_at = excluded.generated_at
+        """,
+        (
+            season,
+            meta["version"],
+            meta["trained_through"],
+            target,
+            passed,
+            json.dumps(summary(report)),
+        ),
+    )
+    conn.commit()
+    return {"from_gameweek": target, "rows": written, "gate_passed": passed}
+
+
+def load_published(
+    conn, season: str, target: int, horizon: int, latest_finished: int | None
+) -> tuple[dict, dict]:
+    """Published predictions for [target, target + horizon), if trustworthy."""
+    run = conn.execute(
+        "select model_version, trained_through, gate_passed, summary"
+        " from prediction_runs where season = %s",
+        (season,),
+    ).fetchone()
+    if run is None:
+        return {}, {"status": "absent", "reason": "No published predictions."}
+    version, trained_through, passed, report = run
+    status = {"status": "inactive", "source": "published", "summary": report}
+    if version != LEARNED_VERSION:
+        status["reason"] = "Published predictions come from different model code; retrain."
+    elif not passed:
+        status["reason"] = "Model has not passed the evaluation gate; the rule-based ranking stays active."
+    elif (latest_finished or 0) - trained_through > MAX_STALE_GAMEWEEKS:
+        status["reason"] = f"Published model is more than {MAX_STALE_GAMEWEEKS} gameweeks old; retrain."
+    else:
+        rows = conn.execute(
+            "select player_code, gameweek, predicted_points, p60 from player_predictions"
+            " where season = %s and gameweek >= %s and gameweek < %s",
+            (season, target, target + horizon),
+        ).fetchall()
+        predictions = {}
+        for code, gw, points, p60 in rows:
+            entry = predictions.setdefault(code, {"points": {}, "p60": None})
+            entry["points"][gw] = float(points)
+            if gw == target and p60 is not None:
+                entry["p60"] = float(p60)
+        if not any(target in p["points"] for p in predictions.values()):
+            status["reason"] = f"No published predictions for GW{target}; retrain."
+        else:
+            for entry in predictions.values():
+                for gw in range(target, target + horizon):
+                    entry["points"].setdefault(gw, 0.0)
+            status.update(status="active", reason="Model passed the evaluation gate.")
+            return predictions, status
+    return {}, status

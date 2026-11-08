@@ -273,16 +273,63 @@ def ingest_player_gameweek_stats(
                 threat = EXCLUDED.threat,
                 ict_index = EXCLUDED.ict_index,
                 total_points = EXCLUDED.total_points,
-                value = EXCLUDED.value,
-                selected = EXCLUDED.selected,
-                transfers_in = EXCLUDED.transfers_in,
-                transfers_out = EXCLUDED.transfers_out,
+                -- Snapshot fields are only supplied for the latest gameweek.
+                -- Keep the first value (captured just after its deadline) so
+                -- later runs neither erase it nor overwrite it with next
+                -- week's price.
+                value = COALESCE(player_gameweek_stats.value, EXCLUDED.value),
+                selected = COALESCE(player_gameweek_stats.selected, EXCLUDED.selected),
+                transfers_in = COALESCE(player_gameweek_stats.transfers_in, EXCLUDED.transfers_in),
+                transfers_out = COALESCE(player_gameweek_stats.transfers_out, EXCLUDED.transfers_out),
                 expected_goals = EXCLUDED.expected_goals,
                 expected_assists = EXCLUDED.expected_assists,
                 fixture_count = EXCLUDED.fixture_count
             """,
             rows,
         )
+
+
+def backfill_gameweek_prices(
+    conn: psycopg.Connection, season: str, client: FPLClient, limit: int | None = 150
+) -> int:
+    """Fill missing per-gameweek prices from each player's FPL history.
+
+    Prices are a model feature; the live snapshot only covers the latest
+    gameweek. Bounded per run so the scheduled ingest stays quick; it
+    converges over a few runs and then does nothing.
+    """
+    missing = [
+        row[0]
+        for row in conn.execute(
+            """
+            select distinct s.player_id from player_gameweek_stats s
+            join gameweeks g on g.season = s.season and g.id = s.gameweek
+            where s.season = %s and g.finished and s.value is null
+            order by s.player_id
+            """,
+            (season,),
+        ).fetchall()
+    ]
+    updates = []
+    for player_id in missing[:limit] if limit else missing:
+        try:
+            history = client.player_summary(player_id).get("history", [])
+        except Exception as exc:  # noqa: BLE001 - one missing player must not fail the ingest
+            print(f"  [prices] player {player_id}: {exc}")
+            continue
+        first = {}
+        for match in history:
+            first.setdefault(match["round"], match["value"])
+        updates += [(value, season, player_id, gw) for gw, value in first.items()]
+    if updates:
+        conn.cursor().executemany(
+            """
+            update player_gameweek_stats set value = %s
+            where season = %s and player_id = %s and gameweek = %s and value is null
+            """,
+            updates,
+        )
+    return len(missing)
 
 
 def ingest_manager(conn: psycopg.Connection, season: str, client: FPLClient, team_id: int, entry: dict) -> None:
@@ -476,6 +523,7 @@ def run_full_ingest() -> None:
         ingest_gameweeks(conn, season, bootstrap)
         ingest_fixtures(conn, season, fixtures)
         ingest_player_gameweek_stats(conn, season, client, bootstrap, fixtures)
+        backfill_gameweek_prices(conn, season, client)
         if FPL_TEAM_ID:
             team_id = int(FPL_TEAM_ID)
             entry = client.entry(team_id)
