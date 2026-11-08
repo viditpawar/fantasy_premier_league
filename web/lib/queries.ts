@@ -779,6 +779,24 @@ export async function getManagerAnalytics(
     };
   });
 
+  // FPL's manager history lags far behind live scores during a gameweek
+  // (and its mid-week average is a partial snapshot). For the unfinished
+  // gameweek, use the same live total as the match centre: saved picks and
+  // multipliers times each player's live points, and drop the stale average.
+  const open = rows.at(-1);
+  if (open && open.finished === false) {
+    const live = await getLiveGameweek(sb, teamId, season);
+    if (live && live.gameweek === open.gameweek) {
+      const previousTotal = rows.length > 1 ? rows[rows.length - 2].totalPoints : 0;
+      open.points = live.liveTotal;
+      open.pointsOnBench = live.benchPoints;
+      open.totalPoints = previousTotal + live.liveTotal - open.transferCost;
+      open.averageEntryScore = null;
+      open.vsAverage = null;
+      open.live = true;
+    }
+  }
+
   const teamValueSeries = (hist ?? []).map((h) => ({
     gameweek: h.gameweek,
     value: (h.team_value ?? 0) / 10,

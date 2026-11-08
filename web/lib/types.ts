@@ -245,6 +245,8 @@ export interface ManagerGameweekRow {
   transferCost: number;
   averageEntryScore: number | null;
   vsAverage: number | null;
+  /** Points come from live player stats because FPL's history still lags. */
+  live?: boolean;
 }
 
 export interface ManagerAnalytics {
