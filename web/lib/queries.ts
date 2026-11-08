@@ -22,6 +22,7 @@ import {
   PlayerGameLogRow,
   PlayerSeasonRow,
   POSITION_NAMES,
+  PredictionRun,
   Position,
   SquadPlayer,
   TopScorer,
@@ -610,6 +611,51 @@ export async function getSquadCodes(
     .eq("season", season)
     .in("id", ids);
   return new Set((players ?? []).map((p) => p.code));
+}
+
+/** Gameweeks of model drift tolerated before predictions are hidden. */
+const MAX_STALE_GAMEWEEKS = 2;
+
+/**
+ * Learned points predictions, only when the published run passed its
+ * evaluation gate and is recent. Each gameweek is fetched separately to stay
+ * under the API row limit.
+ */
+export async function getPredictions(
+  sb: SupabaseClient,
+  season: string,
+  target: number | null,
+  latestFinished: number,
+  horizon = 6,
+): Promise<{ run: PredictionRun | null; byCode: Map<number, { predicted: Record<number, number>; p60: number | null }> }> {
+  const byCode = new Map<number, { predicted: Record<number, number>; p60: number | null }>();
+  if (target == null) return { run: null, byCode };
+  const { data: run, error } = await sb.from("prediction_runs")
+    .select("model_version, trained_through, from_gameweek, gate_passed, summary, generated_at")
+    .eq("season", season).maybeSingle();
+  // An older warehouse without the table simply has no predictions.
+  if (error || !run || !run.gate_passed || latestFinished - run.trained_through > MAX_STALE_GAMEWEEKS) return { run: null, byCode };
+  const weeks = Array.from({ length: Math.min(horizon, 39 - target) }, (_, i) => target + i);
+  const pages = await Promise.all(weeks.map(gw => sb.from("player_predictions")
+    .select("player_code, gameweek, predicted_points, p60").eq("season", season).eq("gameweek", gw)));
+  for (const page of pages) {
+    if (page.error) return { run: null, byCode: new Map() };
+    for (const r of page.data ?? []) {
+      const entry = byCode.get(r.player_code) ?? { predicted: {}, p60: null };
+      entry.predicted[r.gameweek] = Number(r.predicted_points);
+      if (r.gameweek === target && r.p60 != null) entry.p60 = Number(r.p60);
+      byCode.set(r.player_code, entry);
+    }
+  }
+  if (![...byCode.values()].some(e => target in e.predicted)) return { run: null, byCode: new Map() };
+  const holdout = (run.summary as { holdout?: { lift?: number; season?: string } } | null)?.holdout;
+  return {
+    run: {
+      modelVersion: run.model_version, trainedThrough: run.trained_through, fromGameweek: run.from_gameweek,
+      generatedAt: run.generated_at, holdoutLift: holdout?.lift ?? null, holdoutSeason: holdout?.season ?? null,
+    },
+    byCode,
+  };
 }
 
 export async function getPlayers(

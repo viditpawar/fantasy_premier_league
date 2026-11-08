@@ -196,6 +196,20 @@ export interface PlayerSeasonRow {
   formSeries: number[];
   inSquad: boolean;
   upcomingFixtures?: UpcomingFixture[];
+  /** Learned model points per gameweek (before availability), when active. */
+  predicted?: Record<number, number>;
+  /** Learned chance of 60+ minutes in the target gameweek. */
+  p60?: number | null;
+}
+
+/** The published learned-model run behind `predicted` values. */
+export interface PredictionRun {
+  modelVersion: string;
+  trainedThrough: number;
+  fromGameweek: number | null;
+  generatedAt: string;
+  holdoutLift: number | null;
+  holdoutSeason: string | null;
 }
 
 export interface PlayerGameLogRow {

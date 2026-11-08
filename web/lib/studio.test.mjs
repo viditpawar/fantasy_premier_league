@@ -108,3 +108,16 @@ test("CSV escapes embedded quotes, commas and spreadsheet formulas", () => {
   assert.equal(csvCell("=1+2"), '"\'=1+2"');
   assert.equal(csvCell(null), '""');
 });
+
+test("published model predictions drive the index and the suggested XI", () => {
+  const f = [{ gameweek: 9, teamH: 1, teamA: 2, diffH: 2, diffA: 4 }];
+  const modeled = { ...players[12], predicted: { 9: 6.4, 10: 0 } };
+  assert.equal(captainIndex(modeled, f, 9), 6.4);
+  assert.equal(captainIndex(modeled, f, 10), 0, "a blank week predicts nothing");
+  assert.equal(captainIndex({ ...modeled, chance: 50 }, f, 9), 3.2, "availability still applies");
+  assert.equal(captainIndex({ ...modeled, status: "i", chance: 0 }, f, 9), 0);
+  const squad = players.map(p => ({ ...p, predicted: { 9: p.code === 3 ? 0.2 : 2 + p.code / 10 } }));
+  const lineup = suggestLineup(squad, [], 9);
+  assert.ok(!lineup.starters.includes(3), "the defender the model expects to blank is benched");
+  assert.equal(lineup.captain, 15);
+});

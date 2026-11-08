@@ -4,6 +4,8 @@ export interface StudioPlayer {
   code: number; name: string; position: Position; team: string; teamId: number;
   teamCode: number; price: number; status: string; chance: number | null;
   minutes: number; games: number; ppg: number; form: number; lastPoints: number;
+  /** Learned points per gameweek when the published model is active. */
+  predicted?: Record<number, number>; p60?: number | null;
 }
 export interface StudioLineup { starters: number[]; bench: number[]; captain: number; vice: number }
 export interface ResearchFixture { gameweek: number; teamH: number; teamA: number; diffH: number | null; diffA: number | null }
@@ -32,7 +34,8 @@ export function toStudioPlayers(squad: SquadPlayer[], players: PlayerSeasonRow[]
       teamId: p.teamId, teamCode: p.teamCode, price: p.nowCost, status: p.status,
       chance: stats?.chanceOfPlaying ?? null, minutes: stats?.minutes ?? 0,
       games: stats?.gamesPlayed ?? 0, ppg: stats?.pointsPerGame ?? 0,
-      form: stats?.form5 ?? 0, lastPoints: p.lastGameweekPoints };
+      form: stats?.form5 ?? 0, lastPoints: p.lastGameweekPoints,
+      predicted: stats?.predicted, p60: stats?.p60 ?? null };
   });
 }
 
@@ -81,12 +84,17 @@ export function fixtureWindow(fixtures: ResearchFixture[], teamId: number, targe
     doubles: cells.filter(c => c.length > 1).length, unknown: matches.length - ratings.length };
 }
 
-/** A transparent shortlist index, not calibrated expected points. */
+/**
+ * Learned predicted points (doubles summed, blanks zero) scaled by current
+ * availability when the gated model is published; otherwise a transparent
+ * shortlist index, not calibrated expected points.
+ */
 export function captainIndex(player: StudioPlayer, fixtures: ResearchFixture[], target: number): number {
   if (["i", "s", "u", "n"].includes(player.status) || player.chance === 0) return 0;
+  const risk = player.chance != null ? player.chance / 100 : player.status === "d" ? 0.75 : 1;
+  if (player.predicted) return Math.max(0, player.predicted[target] ?? 0) * risk;
   const matches = fixtures.filter(f => f.gameweek === target && (f.teamH === player.teamId || f.teamA === player.teamId));
   const sample = player.games ? Math.min(1, player.minutes / (player.games * 75)) : 0;
-  const risk = player.chance != null ? player.chance / 100 : player.status === "d" ? 0.75 : 1;
   return player.ppg * sample * risk * matches.reduce((sum, f) => sum + 1 + (3 - ((f.teamH === player.teamId ? f.diffH : f.diffA) ?? 3)) * 0.08, 0);
 }
 
