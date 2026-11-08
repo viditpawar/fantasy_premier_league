@@ -109,17 +109,47 @@ def performance_profile(player: dict) -> dict:
     }
 
 
-def apply_ranking_policy(player: dict, policy: dict) -> dict:
-    """Keep the experimental estimator inactive until its evaluation gate passes.
+def availability_risk(player: dict) -> float:
+    """Current availability multiplier; doubtful without a percentage is 0.75."""
+    if not available(player):
+        return 0.0
+    chance = player.get("chance_of_playing_next_round")
+    return (
+        chance / 100
+        if chance is not None
+        else 0.75
+        if player.get("status") == "d"
+        else 1.0
+    )
+
+
+def apply_ranking_policy(
+    player: dict, policy: dict, prediction: dict | None = None
+) -> dict:
+    """Keep the experimental estimators inactive until their evaluation gate passes.
 
     The fallback retains observed form, with doubles normalized and a separate
     adjustment for recent loss of minutes and current availability. These are
-    decision safeguards, not evidence of predictive lift.
+    decision safeguards, not evidence of predictive lift. When the learned
+    model is selected, its per-gameweek predicted points (doubles summed,
+    blanks zero) replace the rating, scaled by current availability.
     """
     profile = performance_profile(player)
     profile["experimental_rating"] = profile["rating"]
     profile["ranking_source"] = policy["selected"]
     if policy["selected"] == "experimental":
+        return profile
+    if policy["selected"] == "learned" and prediction is not None:
+        risk = availability_risk(player)
+        points = {
+            gw: round(max(0.0, value) * risk, 4)
+            for gw, value in prediction["points"].items()
+        }
+        profile["predicted_points"] = points
+        profile["p60"] = (
+            None if prediction.get("p60") is None else round(prediction["p60"], 3)
+        )
+        profile["rating"] = points[min(points)] if points else 0.0
         return profile
     rows = sorted(
         (r for r in player.get("recent_form", []) if r.get("fixture_count", 1) > 0),
@@ -150,6 +180,9 @@ def apply_ranking_policy(player: dict, policy: dict) -> dict:
 
 def week_score(player: dict, gameweek: int) -> float:
     profile = player.get("performance") or performance_profile(player)
+    # Learned predictions already include the fixture, doubles and blanks.
+    if "predicted_points" in profile:
+        return round(profile["predicted_points"].get(gameweek, 0.0), 4)
     # FDR is ordinal: modest adjustments, never an asserted scoring probability.
     factor = sum(
         1 + (3 - (f.get("difficulty") or 3)) * 0.12
@@ -437,9 +470,12 @@ def decision_context(
     ]
     if len(reliable) >= 2:
         captains = reliable
+    learned = any("predicted_points" in p.get("performance", {}) for p in squad)
     return {
         "model_version": MODEL_VERSION,
-        "score_units": "heuristic index; not expected points",
+        "score_units": "learned predicted points per gameweek (passed the evaluation gate; not a guarantee)"
+        if learned
+        else "heuristic index; not expected points",
         "horizon": horizon,
         "minimum_horizon_gain": MIN_GAIN,
         "baseline": baseline,

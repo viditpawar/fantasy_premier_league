@@ -9,6 +9,8 @@ DATABASE_URL = os.environ.get("DATABASE_URL") or os.environ.get("SUPABASE_DATABA
 FPL_TEAM_ID = os.environ.get("FPL_TEAM_ID") or None
 FPL_EMAIL = os.environ.get("FPL_EMAIL") or None
 FPL_PASSWORD = os.environ.get("FPL_PASSWORD") or None
+# Trained advisor model artifacts (ignored by git; rebuilt with --train).
+MODEL_DIR = os.environ.get("FPL_MODEL_DIR") or "data/models"
 
 
 def current_season(today: date | None = None) -> str:

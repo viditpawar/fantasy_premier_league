@@ -13,6 +13,7 @@ build/
 .ruff_cache/
 data/raw/
 data/warehouse/
+data/models/
 grafana/data/
 postgres-data/
 public/

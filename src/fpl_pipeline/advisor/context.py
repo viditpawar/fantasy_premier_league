@@ -9,6 +9,7 @@ from psycopg.rows import dict_row
 from fpl_pipeline.config import FPL_TEAM_ID
 
 from .evaluation import evaluate_warehouse, ranking_policy
+from .learned import LEARNED_VERSION, load_active, predict_upcoming
 from .model import MODEL_VERSION, apply_ranking_policy, decision_context, week_score
 from .rules import (
     CHIPS,
@@ -365,6 +366,24 @@ def build_context(
     all_codes = [p["player_code"] for p in players]
     form = get_recent_form(conn, season, all_codes)
     policy = ranking_policy(evaluate_warehouse(conn))
+    latest_finished = conn.execute(
+        "select max(id) from gameweeks where season = %s and finished = true",
+        (season,),
+    ).fetchone()[0]
+    bundle, learned_status = load_active(season, latest_finished)
+    predictions = {}
+    if bundle is not None:
+        predictions = predict_upcoming(conn, bundle, season, target, min(4, 39 - target))
+        policy = {
+            **policy,
+            "selected": "learned",
+            "learned_version": LEARNED_VERSION,
+            "reason": "The learned points model passed its held-out season and current-season gate; scores are predicted points per gameweek, adjusted for current availability.",
+            "limitation": "Predictions ignore team news; they are estimates with substantial error, not guarantees.",
+        }
+    elif learned_status["status"] != "absent":
+        warnings.append(f"Learned model inactive: {learned_status['reason']}")
+    policy["learned_model"] = learned_status
     refresh = conn.execute(
         "select completed_at from data_refresh_status where season = %s", (season,)
     ).fetchone()
@@ -393,7 +412,9 @@ def build_context(
         p["recent_form"] = form.get(p["player_code"], [])
         p["upcoming_fixtures"] = fixtures.get(p["team_id"], [])
         p["form_score"] = form_score(p["recent_form"])
-        p["performance"] = apply_ranking_policy(p, policy)
+        p["performance"] = apply_ranking_policy(
+            p, policy, predictions.get(p["player_code"])
+        )
         horizon = min(4, 39 - target)
         p["score"] = round(sum(week_score(p, gw) for gw in range(target, target + horizon)) / horizon, 3)
         p["captain_score"] = week_score(p, target)
@@ -457,7 +478,13 @@ def build_context(
         decision["lineup"],
     )
     warnings.append(
-        "Form and fixtures are warehouse snapshots; refresh ingestion and team news before using advice. Scores rank options and are not expected points. No points-hit recommendation is supported."
+        "Form and fixtures are warehouse snapshots; refresh ingestion and team news before using advice. "
+        + (
+            "Scores are learned predicted points, not guarantees."
+            if policy["selected"] == "learned"
+            else "Scores rank options and are not expected points."
+        )
+        + " No points-hit recommendation is supported."
     )
     context = {
         "model_version": MODEL_VERSION,

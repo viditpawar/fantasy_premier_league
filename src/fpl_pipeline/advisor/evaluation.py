@@ -5,6 +5,7 @@ Current prices, availability and news must never enter a historical ranking.
 """
 
 from collections import defaultdict
+from collections.abc import Callable
 from copy import deepcopy
 
 from psycopg.rows import dict_row
@@ -34,8 +35,18 @@ def ranking_policy(report: dict) -> dict:
     }
 
 
-def evaluate_rankings(rows: list[dict], top_n: int = 5) -> dict:
-    """Score each next GW using strictly earlier rows; same pool for both models."""
+def evaluate_rankings(
+    rows: list[dict],
+    top_n: int = 5,
+    scorer: Callable[[dict, dict], float | None] | None = None,
+) -> dict:
+    """Score each next GW using strictly earlier rows; same pool for both models.
+
+    `scorer(actual_row, profile)` replaces the experimental rating as the "new"
+    ranking. It must use only information known before that gameweek (the
+    learned model passes walk-forward predictions). Players it cannot score are
+    removed from both rankings, so the pool stays identical.
+    """
     history = defaultdict(list)
     by_week = defaultdict(list)
     for row in rows:
@@ -61,11 +72,14 @@ def evaluate_rankings(rows: list[dict], top_n: int = 5) -> dict:
                 continue
             if actual.get("fixture_count", 1) < 1:
                 continue
+            new = scorer(actual, profile) if scorer else profile["rating"]
+            if new is None:
+                continue
             old = form_score([r for r in past if r["gameweek"] >= gw - 5])
             groups[actual["position"]].append(
                 {
                     "code": actual["player_code"],
-                    "new": profile["rating"],
+                    "new": new,
                     "old": old,
                     "actual": actual["total_points"] / actual.get("fixture_count", 1),
                 }

@@ -195,7 +195,7 @@ Without `--state`, the prompt is **research only**. Public locked picks cannot e
 - Transfer `limit` means the allocation **before** this week's moves. `limit: 2` and `made: 2` leaves zero free transfers.
 - Money in state files is in tenths of a million: `52` means **£5.2m**.
 - Suggested moves are independent alternatives. Three ideas do not mean three transfers should be made.
-- Ranking indices are **not expected points**. Paid-hit recommendations remain disabled.
+- The rule-based ranking indices are **not expected points**. Paid-hit recommendations remain disabled.
 - The experimental underlying-data ranking stays inactive until it clears a historical evaluation gate. A ranking diagnostic is not proof of future transfer profitability.
 - Team news, future minutes, price changes and outcomes remain uncertain. Check the snapshot date and official FPL before acting.
 
@@ -204,6 +204,24 @@ Run the read-only walk-forward ranking comparison:
 ```powershell
 python -m fpl_pipeline.advisor --evaluate
 ```
+
+### The learned points model
+
+An optional trained model can replace the rule-based ranking. Two gradient-boosted models (scikit-learn) predict **points per fixture** and the **chance of 60+ minutes** from recent minutes, points, bonus, ICT, xG/xA, price, last season's output and fixture context (home/away, difficulty, both clubs' recent goals). Every input is computed only from gameweeks before the one being predicted; live injury status and news are deliberately excluded and applied afterwards as an availability multiplier.
+
+```powershell
+pip install -e ".[ml]"
+python -m fpl_pipeline.advisor --train   # read-only on the warehouse; about a minute
+```
+
+`--train` needs at least two completed seasons (run the historical backfill first). It then:
+
+1. trains on earlier seasons and tests on the **last completed season**, held out entirely;
+2. retrains before **each finished week of the current season** and tests on that week;
+3. compares top-five picks per position against the form ranking on the same player pool, and prediction error against a last-five-games average;
+4. fits the final model on everything and saves it with its report under `data/models/` (git-ignored; `FPL_MODEL_DIR` overrides).
+
+The advisor uses the model only if it passed this gate: at least 30 held-out weeks with a lift of **≥ 0.15 points per pick**, lower prediction error than the naive average, and at least six current-season weeks with **no regression**. A model trained for another season or more than two gameweeks out of date is ignored with a warning. When active, `ranking_policy.selected` is `learned`, scores become predicted points per gameweek (doubles summed, blanks zero) and each player shows `performance.p60`. All legality, bench-cover and validation checks are unchanged. Retrain weekly after the gameweek's data is ingested.
 
 The [advisor audit](docs/advisor-audit.md) documents the state format. The [GW8 investigation](docs/gameweek-8-review.md) explains the model checks, measured limitations and bench-review fixes.
 

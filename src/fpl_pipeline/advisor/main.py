@@ -33,6 +33,11 @@ hit_transfers empty because this pipeline has no calibrated points forecast.
 Check ranking_policy: the experimental underlying-data estimator is disabled
 unless it passes the historical evaluation gate. Never describe an inactive
 experimental model as a proven improvement. Explain sparse data honestly.
+If ranking_policy.selected is "learned", scores are the trained model's
+predicted points per gameweek (see decision.score_units and each player's
+performance.p60 chance of 60+ minutes). They passed a held-out evaluation
+but ignore team news and carry large error: cite them as estimates, never as
+promised returns, and still keep hit_transfers empty.
 
 If state is verified, use transfer_state.remaining AFTER transfers already
 made. Costs already committed are sunk; do not recommend reversing a move
@@ -229,12 +234,32 @@ def main() -> None:
         "--evaluate", action="store_true",
         help="Read-only walk-forward ranking comparison on completed gameweeks.",
     )
+    parser.add_argument(
+        "--train", action="store_true",
+        help="Train, evaluate and save the learned points model (needs the ml extra).",
+    )
     args = parser.parse_args()
     if args.evaluate and (args.state or args.apply or args.check):
         parser.error("--evaluate cannot be combined with --state, --apply or --check")
+    if args.train and (args.evaluate or args.state or args.apply or args.check):
+        parser.error("--train cannot be combined with other options")
     if args.check and not args.apply:
         parser.error("--check requires --apply FILE")
     try:
+        if args.train:
+            from .learned import summary, train
+
+            with get_connection() as conn:
+                conn.read_only = True
+                report = train(conn)
+            print(json.dumps(summary(report), indent=2))
+            print(
+                "Learned model "
+                + ("PASSED" if report["gate"]["passed"] else "did not pass")
+                + " the gate; the advisor "
+                + ("will use it." if report["gate"]["passed"] else "keeps the rule-based ranking.")
+            )
+            return
         if args.evaluate:
             with get_connection() as conn:
                 conn.read_only = True
@@ -274,6 +299,8 @@ def main() -> None:
             2,
             "Advisor: warehouse connection/query failed. Check database connectivity and refresh ingestion.\n",
         )
+    except ImportError as exc:
+        parser.exit(2, f"Advisor: {exc}. Install the ml extra: pip install -e .[ml]\n")
     except (ValueError, OSError) as exc:
         parser.exit(2, f"Advisor: {exc}\n")
 
