@@ -1,6 +1,7 @@
 """Learned estimator: leakage safety, determinism, gate and ranking integration."""
 
 from copy import deepcopy
+from datetime import UTC, datetime, timedelta
 from math import isnan
 
 import pytest
@@ -136,6 +137,9 @@ def report(holdout_lift=0.3, holdout_weeks=34, current_lift=0.1, current_weeks=7
             "season": "x",
             "model_mae": mae[0],
             "naive_mae": mae[1],
+            "model_rmse": 3.0,
+            "naive_rmse": 3.2,
+            "regular_players": {"examples": 100, "model_rmse": 3.0, "naive_rmse": 3.2},
             "ranking": {"weeks": [{}] * weeks, "lift": lift, "model_return": 4, "baseline_return": 4 - lift},
         }
 
@@ -272,13 +276,15 @@ class FakeConn:
 
 
 def published_run(**overrides):
-    run = {"version": learned.LEARNED_VERSION, "through": 9, "passed": True}
+    run = {"version": learned.LEARNED_VERSION, "through": 9, "passed": True,
+           "from": 11, "generated_at": datetime.now(UTC)}
     run.update(overrides)
-    return (run["version"], run["through"], run["passed"], {"gate": {"passed": run["passed"]}})
+    return (run["version"], run["through"], run["passed"], {"gate": {"passed": run["passed"]}}, run["from"], run["generated_at"])
 
 
-def test_published_predictions_fill_blank_weeks_and_respect_the_gate():
-    rows = [(7, 11, 5.5, 0.9), (7, 12, 4.0, 0.8), (8, 11, 2.0, None)]
+def test_published_predictions_require_explicit_blanks_and_respect_the_gate():
+    rows = [(7, 11, 5.5, 0.9), (7, 12, 4.0, 0.8), (7, 13, 0, None), (7, 14, 0, None)]
+    rows += [(8, gw, 2.0, None) for gw in range(11, 15)]
     predictions, status = learned.load_published(FakeConn(published_run(), rows), "2026-27", 11, 4, 10)
     assert status["status"] == "active"
     assert predictions[7] == {"points": {11: 5.5, 12: 4.0, 13: 0.0, 14: 0.0}, "p60": 0.9}
@@ -287,12 +293,16 @@ def test_published_predictions_fill_blank_weeks_and_respect_the_gate():
         (published_run(passed=False), "gate"),
         (published_run(through=6), "old"),
         (published_run(version="learned-hgb-v0"), "different model"),
+        (published_run(generated_at=datetime.now(UTC) - timedelta(hours=25)), "refresh"),
+        (published_run(through=11), "unfinished"),
     ]:
         predictions, status = learned.load_published(FakeConn(run, rows), "2026-27", 11, 4, 10)
         assert predictions == {} and reason in status["reason"]
     assert learned.load_published(FakeConn(None, rows), "2026-27", 11, 4, 10)[1]["status"] == "absent"
-    missing = learned.load_published(FakeConn(published_run(), rows), "2026-27", 13, 4, 10)
-    assert missing[0] == {} and "GW13" in missing[1]["reason"]
+    missing = learned.load_published(FakeConn(published_run(), rows), "2026-27", 16, 4, 10)
+    assert missing[0] == {} and "GW16" in missing[1]["reason"]
+    incomplete = learned.load_published(FakeConn(published_run(), rows[:-1]), "2026-27", 11, 4, 10)
+    assert incomplete[0] == {} and "incomplete" in incomplete[1]["reason"]
 
 
 def test_upcoming_examples_freeze_form_at_the_deadline():
@@ -305,7 +315,7 @@ def test_upcoming_examples_freeze_form_at_the_deadline():
     assert {gw for _, gw in keys} == {6, 7, 8}
     by_key = dict(zip(keys, examples))
     a, b = by_key[1, 6], by_key[1, 8]
-    assert a["points_5"] == b["points_5"] and a["price"] == 6.0
+    assert a["points_5"] == b["points_5"] and a["price"] == 5.1
     assert b["gameweek"] == 8
     # Rows at or after the target (none exist pre-deadline in practice) are ignored.
     leaked = [dict(r, total_points=99) if r["gameweek"] >= 6 else r for r in rows]

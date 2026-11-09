@@ -207,26 +207,29 @@ python -m fpl_pipeline.advisor --evaluate
 
 ### The learned points model
 
-An optional trained model can replace the rule-based ranking. Two gradient-boosted models (scikit-learn) predict **points per fixture** and the **chance of 60+ minutes** from recent and longer-run minutes, starts, points, bonus, BPS, ICT, threat, creativity, saves, xG/xA, the player's share of club xG, price, last season's output and fixture context (home/away, difficulty, both clubs' recent goals, xG for/against and clean sheets). Every input is computed only from gameweeks before the one being predicted; live injury status and news are deliberately excluded and applied afterwards as an availability multiplier.
+An optional trained model can replace the rule-based ranking. Two gradient-boosted models (scikit-learn) predict **points per fixture** and the **chance of 60+ minutes** from recent and longer-run minutes, starts, points, bonus, BPS, ICT, threat, creativity, saves, xG/xA, the player's share of club xG, the last observed price, last season's output and fixture context (home/away, both clubs' recent goals, xG for/against and clean sheets). Player and club form exclude results unavailable before the target deadline, including overlapping gameweeks. Current-week price snapshots and mutable difficulty ratings are excluded; live injury status and news are applied afterwards as an availability multiplier.
 
 ```powershell
 pip install -e ".[ml]"
-python -m fpl_pipeline.advisor --train   # about a minute; add --no-publish to keep it local
+python -m fpl_pipeline.advisor --train   # allow several minutes; add --no-publish to keep it local
 ```
 
 `--train` needs at least two completed seasons (run the historical backfill first). It then:
 
-1. trains on earlier seasons and tests on the **last completed season**, held out entirely;
-2. retrains before **each finished week of the current season** and tests on that week;
-3. compares top-five picks per position against the form ranking on the same player pool, and prediction error against a last-five-games average;
-4. fits the final model on everything and saves it with its report under `data/models/` (git-ignored; `FPL_MODEL_DIR` overrides);
-5. publishes the next six gameweeks of predictions to `player_predictions`, with the run and gate result in `prediction_runs`. A failing model clears them instead.
+1. checks training data for duplicates, invalid minutes/points and unrepaired double-gameweek records;
+2. compares four fixed model settings on an **earlier validation season**, then tests the selected setting on the **last completed season**, excluded from parameter selection and fitting;
+3. retrains before **each finished week of the current season**, including GW1, and tests on that week;
+4. compares top-five picks per position against the form ranking on the same player pool, and reports prediction errors overall, by position and for regular players, plus playing-time accuracy and weekly ranking uncertainty;
+5. fits the final model on everything and saves it with its full report, data fingerprint and library versions under `data/models/` (git-ignored; `FPL_MODEL_DIR` overrides);
+6. publishes the next six gameweeks of predictions to `player_predictions`, with the run and gate result in `prediction_runs`. A failing model clears them instead.
 
-The model is used only if it passed this gate: at least 30 held-out weeks with a lift of **≥ 0.15 points per pick**, lower prediction error than the naive average, and at least six current-season weeks with **no regression**. A model trained for another season or more than two gameweeks out of date is ignored with a warning. When active, `ranking_policy.selected` is `learned`, scores become predicted points per gameweek (doubles summed, blanks zero) and each player shows `performance.p60`. All legality, bench-cover and validation checks are unchanged. The advisor prefers a fresh local model and otherwise reads the published predictions.
+The model is used only if it passed this gate: at least 30 held-out weeks with a lift of **≥ 0.15 points per pick**, lower mean absolute error than the naive average, and at least six current-season ranking weeks with **no regression**. Both periods must also avoid regression in squared-error measures overall and for regular players; current-season absolute error cannot regress either. A model trained for another season, a future gameweek or more than two gameweeks out of date is ignored. Published forecasts must match the current model version, be complete and finite, and have been refreshed within 24 hours. When active, `ranking_policy.selected` is `learned` and scores become predicted points per gameweek. Doubles use the same averaged fixture context as training, scaled by the fixture count; blanks have an explicit zero. `performance.p60` describes single fixtures only: aggregated doubles cannot establish a reliable 60-minute label. The advisor prefers a fresh local model and otherwise reads published predictions.
 
-The **Train points model** workflow retrains and publishes daily (05:30 UTC, or run it manually) using the same `DATABASE_URL` secret as the ingest. The lineup studio's *Suggest XI* and the research lab's captain shortlist then use published predictions, scaled by current availability, and fall back to their observed-points index when no passing run is published.
+The **Train points model** workflow runs after successful ingestion and daily at 05:30 UTC (or manually), using the same `DATABASE_URL` secret as the ingest. It skips a run only while the training coverage, target deadline and daily forecast refresh are current. Model artifacts and full reports are retained as workflow artifacts for 30 days. The lineup studio's *Suggest XI* and the research lab's captain shortlist use published predictions, scaled by current availability, and fall back to their observed-points index when no passing run is available. Quality checks install the ML dependencies so training tests actually run in CI.
 
-Model settings were chosen on 2024-25 (trained on 2021-22 to 2023-24) and confirmed once on untouched 2025-26: shallow, heavily regularized trees generalized best because FPL points are noisy. Prices are model inputs, so the live ingest keeps each gameweek's first recorded price and backfills missing ones from each player's FPL history.
+Parameter selection uses the season before the held-out test: with the current warehouse, training through 2023-24, validation on 2024-25 and testing on 2025-26. The current season is a monitoring check, not a tuning set. Older historical tests have been inspected during development, so future saved forecasts remain the strongest independent check. Archive fixture lists and reconstructed deadlines are not a complete archive of what managers knew at every deadline. See the [model audit](docs/model-audit.md) for the repaired data, measured results and remaining limits.
+
+A validation winner is a challenger to the original fixed settings. If it fails activation, the original settings are checked on the same repaired features and may stay in service only if they pass the identical gate. If both fail, the form ranking stays active. Full reports preserve both comparisons; current-season results never start a new parameter search or weaken the gate.
 
 The [advisor audit](docs/advisor-audit.md) documents the state format. The [GW8 investigation](docs/gameweek-8-review.md) explains the model checks, measured limitations and bench-review fixes.
 

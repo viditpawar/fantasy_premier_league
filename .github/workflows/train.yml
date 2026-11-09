@@ -5,8 +5,8 @@ name: Train points model
 # that fails the gate clears published predictions instead.
 #
 # Runs after each successful ingest, but only retrains when a gameweek has
-# newly finished or the next deadline changed (--if-stale). The daily
-# schedule is a fallback; manual runs always retrain.
+# newly finished, the next deadline changed, or the daily fixture refresh is
+# due (--if-stale). Manual runs always retrain.
 on:
   workflow_run:
     workflows: ["Live ingest"]
@@ -37,3 +37,11 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           IF_STALE: ${{ github.event_name == 'workflow_dispatch' && '' || '--if-stale' }}
         run: python -m fpl_pipeline.advisor --train $IF_STALE
+      - name: Save model and full evaluation report
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: points-model-${{ github.run_id }}
+          path: data/models/
+          if-no-files-found: ignore
+          retention-days: 30

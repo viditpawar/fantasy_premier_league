@@ -10,6 +10,7 @@ from copy import deepcopy
 
 from psycopg.rows import dict_row
 
+from .features import known_before
 from .model import MODEL_VERSION, performance_profile
 from .rules import POSITIONS, form_score
 
@@ -56,7 +57,7 @@ def evaluate_rankings(
         groups = defaultdict(list)
         for actual in actuals:
             past = sorted(
-                history[actual["player_code"]],
+                [r for r in history[actual["player_code"]] if known_before(r, actual.get("deadline_time"))],
                 key=lambda r: r["gameweek"],
                 reverse=True,
             )

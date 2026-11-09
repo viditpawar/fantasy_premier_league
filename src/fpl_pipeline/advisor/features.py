@@ -1,14 +1,17 @@
 """Leakage-safe model inputs for the learned points estimator.
 
 Every feature for a (season, player, gameweek) example is computed from rows
-with a strictly earlier gameweek in that season, the player's previous-season
-totals, and that gameweek's fixture list and price, all known before the
-deadline. Live status, news and chance of playing are never features: they are
+available before its deadline in strictly earlier gameweeks, the player's
+previous-season totals, and the fixture list. Prices use the last observed
+prior week; mutable difficulty snapshots are excluded. Live status, news and
+chance of playing are never features: they are
 not stored for past gameweeks, so including them would train on information
 the historical rows cannot reproduce. Availability is applied after prediction.
 """
 
 from collections import defaultdict
+from datetime import UTC, datetime, timedelta
+from functools import cache
 from math import isnan, nan
 
 from psycopg.rows import dict_row
@@ -49,7 +52,6 @@ PLAYER_FEATURES = [
 ]
 FIXTURE_FEATURES = [
     "was_home",
-    "difficulty",
     "team_scored_5",
     "team_conceded_5",
     "team_clean_sheets_5",
@@ -76,9 +78,32 @@ def _per_fixture(rows: list[dict], key: str) -> float:
 
 
 def _starts(rows: list[dict]) -> float:
+    # Aggregated doubles cannot tell us whether either individual match
+    # reached 60 minutes (90 + 30 and 60 + 60 both total 120).
+    rows = [r for r in rows if r["fixture_count"] == 1]
     if not rows:
         return nan
     return sum(r["minutes"] / r["fixture_count"] >= 60 for r in rows) / len(rows)
+
+
+def _timestamp(value) -> datetime | None:
+    if value is None:
+        return None
+    parsed = datetime.fromisoformat(value) if isinstance(value, str) else value
+    return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed
+
+
+def deadline(fixtures: list[dict], gameweek: int) -> datetime | None:
+    """Use the stored deadline, or conservatively reconstruct archive deadlines."""
+    week = [f for f in fixtures if f.get("gameweek") == gameweek]
+    recorded = [_timestamp(f.get("deadline_time")) for f in week if f.get("deadline_time")]
+    kickoffs = [_timestamp(f["kickoff_time"]) for f in week if f.get("kickoff_time")]
+    return min(recorded) if recorded else min(kickoffs) - timedelta(minutes=90) if kickoffs else None
+
+
+def known_before(row: dict, cutoff: datetime | None) -> bool:
+    available = _timestamp(row.get("available_at"))
+    return cutoff is None or (available is not None and available < cutoff)
 
 
 def _xg(rows: list[dict]) -> list[dict]:
@@ -95,9 +120,13 @@ def history_features(
     gameweek: int,
     price: float | None,
     previous: dict | None,
+    cutoff: datetime | None = None,
 ) -> dict:
     """Player form from strictly earlier played gameweeks (oldest first)."""
-    prior = [r for r in prior if r["fixture_count"] > 0 and r["gameweek"] < gameweek]
+    prior = [
+        r for r in prior
+        if r["fixture_count"] > 0 and r["gameweek"] < gameweek and known_before(r, cutoff)
+    ]
     last3, last5, last10 = prior[-3:], prior[-5:], prior[-10:]
     xg5 = _xg(last5)
     xg_minutes = sum(r["minutes"] for r in xg5)
@@ -190,6 +219,7 @@ class TeamForm:
             ):
                 xg[r["fixture_id"], row_team(r, by_fixture)] += r["expected_goals"]
         self.results = defaultdict(list)
+        self.fixtures = fixtures
         for f in fixtures:
             if (
                 f.get("finished")
@@ -200,17 +230,24 @@ class TeamForm:
                 known = (f["id"], home) in xg and (f["id"], away) in xg
                 hxg = xg[f["id"], home] if known else nan
                 axg = xg[f["id"], away] if known else nan
+                kickoff = _timestamp(f.get("kickoff_time"))
+                available = kickoff + timedelta(hours=3) if kickoff else None
                 self.results[home].append(
-                    (f["gameweek"], f["team_h_score"], f["team_a_score"], hxg, axg)
+                    (f["gameweek"], f["team_h_score"], f["team_a_score"], hxg, axg, available)
                 )
                 self.results[away].append(
-                    (f["gameweek"], f["team_a_score"], f["team_h_score"], axg, hxg)
+                    (f["gameweek"], f["team_a_score"], f["team_h_score"], axg, hxg, available)
                 )
         for games in self.results.values():
             games.sort(key=lambda g: g[0])
 
+    @cache  # noqa: B019 - each instance exists for one season's feature build
     def before(self, team: int, gameweek: int) -> dict:
-        games = [g for g in self.results.get(team, []) if g[0] < gameweek][-5:]
+        cutoff = deadline(self.fixtures, gameweek)
+        games = [
+            g for g in self.results.get(team, [])
+            if g[0] < gameweek and (cutoff is None or (g[5] is not None and g[5] < cutoff))
+        ][-5:]
         if not games:
             return {k: nan for k in ("scored", "conceded", "clean_sheets", "xg", "xga")}
         return {
@@ -231,7 +268,6 @@ def fixture_features(fixture: dict, team: int, form: TeamForm, as_of: int | None
     own, opp = form.before(team, cutoff), form.before(opponent, cutoff)
     return {
         "was_home": float(home),
-        "difficulty": _num(fixture.get("team_h_difficulty" if home else "team_a_difficulty")),
         "team_scored_5": own["scored"],
         "team_conceded_5": own["conceded"],
         "team_clean_sheets_5": own["clean_sheets"],
@@ -287,7 +323,11 @@ def build_examples(
                 team = row_team(r, by_fixture)
                 week = by_team_week.get((team, r["gameweek"]), [])
                 if week:
-                    value = r.get("value")
+                    cutoff = deadline(fixtures, r["gameweek"])
+                    known = [h for h in history if known_before(h, cutoff)]
+                    # Today's fixture ratings and archive prices can be revised
+                    # after a deadline. Use only the last observed price.
+                    value = known[-1].get("value") if known else None
                     example = combine(
                         history_features(
                             history,
@@ -295,6 +335,7 @@ def build_examples(
                             r["gameweek"],
                             value / 10 if value is not None else None,
                             previous.get(code),
+                            cutoff,
                         ),
                         [fixture_features(f, team, form) for f in week],
                     )
@@ -303,7 +344,10 @@ def build_examples(
                             "season": r["season"],
                             "player_code": code,
                             "target_points": float(r["total_points"]) / r["fixture_count"],
-                            "target_60": float(r["minutes"] / r["fixture_count"] >= 60),
+                            "target_60": float(r["minutes"] >= 60) if r["fixture_count"] == 1 else None,
+                            "fixture_count": r["fixture_count"],
+                            "available_at": r.get("available_at"),
+                            "deadline_time": cutoff,
                         }
                     )
                     examples.append(example)
@@ -329,9 +373,10 @@ STATS_QUERY = """
 """
 
 FIXTURES_QUERY = """
-    select id, gameweek, team_h, team_a, team_h_score, team_a_score, finished,
-        team_h_difficulty, team_a_difficulty
-    from fixtures where season = %s
+    select f.id, f.gameweek, f.team_h, f.team_a, f.team_h_score, f.team_a_score, f.finished,
+        f.team_h_difficulty, f.team_a_difficulty, f.kickoff_time, g.deadline_time
+    from fixtures f left join gameweeks g on g.season = f.season and g.id = f.gameweek
+    where f.season = %s
 """
 
 NUMERIC = ("expected_goals", "expected_assists", "ict_index", "threat", "creativity")
@@ -348,6 +393,17 @@ def load_season(conn, season: str) -> tuple[list[dict], list[dict]]:
         for key in NUMERIC:
             if r[key] is not None:
                 r[key] = float(r[key])
+    by_fixture = {f["id"]: f for f in fixtures}
+    by_team_week = defaultdict(list)
+    for f in fixtures:
+        kickoff = _timestamp(f.get("kickoff_time"))
+        if kickoff:
+            for team in (f["team_h"], f["team_a"]):
+                by_team_week[team, f["gameweek"]].append(kickoff + timedelta(hours=3))
+    for r in rows:
+        times = by_team_week[row_team(r, by_fixture), r["gameweek"]]
+        r["available_at"] = max(times) if times else None
+        r["deadline_time"] = deadline(fixtures, r["gameweek"])
     return rows, fixtures
 
 
@@ -371,14 +427,18 @@ def load_raw(conn) -> dict:
 
 def prepare(raw: dict) -> dict:
     """Add examples to raw season data, each season primed by the one before."""
-    previous = {}
+    previous, previous_year = {}, None
     for season in sorted(raw):
         season_data = raw[season]
+        year = int(season[:4])
+        if previous_year is not None and year != previous_year + 1:
+            previous = {}
         season_data["previous"] = previous
         season_data["examples"] = build_examples(
             season_data["rows"], season_data["fixtures"], previous
         )
         previous = previous_summaries(season_data["rows"])
+        previous_year = year
     return raw
 
 
