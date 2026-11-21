@@ -327,6 +327,50 @@ def test_bench_boost_requires_minutes_from_starters_as_well_as_bench(context):
     assert not compute_chip_advice(squad, 9, ["bboost"])["bench_boost"]["recommended"]
 
 
+ALL_CHIPS = ["wildcard", "freehit", "bboost", "3xc"]
+
+
+def test_bench_boost_counts_the_squad_after_the_top_transfer_near_expiry(context):
+    squad = context["squad"]
+    for row in squad[14]["recent_form"]:
+        row["minutes"] = 0  # a non-playing reserve blocks Bench Boost today
+    assert not compute_chip_advice(squad, 11, ALL_CHIPS)["bench_boost"]["recommended"]
+    replacement = copy.deepcopy(squad[13])
+    replacement["player_id"] = 99
+    after = squad[:14] + [replacement]
+    advice = compute_chip_advice(squad, 11, ALL_CHIPS, after_transfer=after)
+    assert advice["bench_boost"]["recommended"]
+    assert "expire after GW19" in advice["bench_boost"]["reason"]
+    assert "after the top eligible transfer" in advice["bench_boost"]["reason"]
+    # Without expiry pressure (one chip, many weeks) the reserve still blocks it.
+    assert not compute_chip_advice(squad, 3, ["bboost"], after_transfer=after)["bench_boost"][
+        "recommended"
+    ]
+
+
+def test_single_gameweek_triple_captain_only_under_expiry_pressure(context):
+    squad = context["squad"]
+    lineup = {"starters": [p["player_id"] for p in squad if p["squad_position"] <= 11]}
+    forward = next(p for p in squad if p["position"] == "FWD" and p["squad_position"] <= 11)
+    forward["upcoming_fixtures"] = [{"gameweek": 17, "was_home": True, "difficulty": 2}]
+    forward["performance"] = {"recent_minutes": 90}
+    reason = compute_chip_advice(squad, 17, ["3xc", "freehit"], lineup=lineup)["triple_captain"]
+    assert reason["recommended"] and "easy (difficulty 2) home fixture" in reason["reason"]
+    assert not compute_chip_advice(squad, 5, ["3xc"], lineup=lineup)["triple_captain"][
+        "recommended"
+    ]
+    forward["upcoming_fixtures"][0]["was_home"] = False
+    assert not compute_chip_advice(squad, 17, ["3xc", "freehit"], lineup=lineup)[
+        "triple_captain"
+    ]["recommended"]
+
+
+def test_chip_window_rolls_to_the_second_half():
+    from fpl_pipeline.advisor.context import chip_window
+
+    assert chip_window(1) == 19 and chip_window(19) == 19 and chip_window(20) == 38
+
+
 @pytest.mark.parametrize(
     "mutation,match",
     [

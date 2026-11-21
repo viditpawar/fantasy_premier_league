@@ -213,14 +213,47 @@ def confirmed_state(
     return squad, result
 
 
+# FPL issues each chip twice: the first set must be played by GW19, the
+# second from GW20 to GW38. Unused chips are lost at the window's end.
+CHIP_WINDOW_ENDS = (19, 38)
+# Share of remaining gameweeks that unused chips would need before timing
+# pressure relaxes the double-gameweek-only triggers (4 chips in 9 weeks).
+EXPIRY_PRESSURE = 0.4
+
+
+def chip_window(target: int) -> int:
+    return next(end for end in CHIP_WINDOW_ENDS if target <= end)
+
+
+def bench_ready(squad: list[dict]) -> bool:
+    """Every one of the 15 is available, has a fixture and played 60+ minutes
+    per fixture across the last two recorded gameweeks."""
+    return len(squad) == 15 and all(
+        available(p)
+        and p["next_gameweek_fixture_count"] > 0
+        and p["recent_form"]
+        and any(r.get("fixture_count", 1) > 0 for r in p["recent_form"][:2])
+        and sum(r["minutes"] for r in p["recent_form"][:2])
+        >= 60 * sum(r.get("fixture_count", 1) for r in p["recent_form"][:2])
+        for p in squad
+    )
+
+
 def compute_chip_advice(
     squad: list[dict],
     target: int,
     available_chips: list[str] | None = None,
     active_chip: str | None = None,
     lineup: dict | None = None,
+    after_transfer: list[dict] | None = None,
 ) -> dict:
-    """Conservative planning signals, gated on confirmed chip availability."""
+    """Conservative planning signals, gated on confirmed chip availability.
+
+    `after_transfer` is the squad after the top eligible transfer: selling a
+    non-playing reserve can be what makes a Bench Boost viable. When unused
+    chips nearly fill the gameweeks left before they expire, single-gameweek
+    Bench Boost and Triple Captain signals replace waiting for a double.
+    """
     fit = [p for p in squad if available(p) and p["next_gameweek_fixture_count"] > 0]
     counts = Counter(p["position"] for p in fit)
     # Capacity of a legal starting formation, allowing unfilled slots.
@@ -234,14 +267,17 @@ def compute_chip_advice(
     unavailable = sum(not available(p) for p in squad)
     # Bench Boost scores all 15. Reliable reserves cannot compensate for a
     # non-playing nominal starter; inspect minutes across the whole squad.
-    squad_ready = all(
-        available(p)
-        and p["next_gameweek_fixture_count"] > 0
-        and p["recent_form"]
-        and any(r.get("fixture_count", 1) > 0 for r in p["recent_form"][:2])
-        and sum(r["minutes"] for r in p["recent_form"][:2])
-        >= 60 * sum(r.get("fixture_count", 1) for r in p["recent_form"][:2])
-        for p in squad
+    squad_ready = bench_ready(squad)
+    ready_after = after_transfer is not None and bench_ready(after_transfer)
+    expiry = chip_window(target)
+    weeks_left = expiry - target + 1
+    unused = len(available_chips) if available_chips is not None else 0
+    pressured = unused >= 2 and unused / weeks_left >= EXPIRY_PRESSURE
+    expiry_note = (
+        f" {unused} unused chips expire after GW{expiry}, with {weeks_left} gameweeks left"
+        " to play them (one per gameweek), so a strong single gameweek is worth using."
+        if pressured
+        else ""
     )
     starter_ids = set(lineup["starters"]) if lineup else {p["player_id"] for p in squad if p["squad_position"] <= 11}
     captain_double = any(
@@ -249,6 +285,18 @@ def compute_chip_advice(
         and p["player_id"] in starter_ids
         and p["next_gameweek_fixture_count"] >= 2
         and p["form_score"] >= 5
+        for p in squad
+    )
+    easy_home_captain = pressured and any(
+        available(p)
+        and p["player_id"] in starter_ids
+        and p["next_gameweek_fixture_count"] == 1
+        and ((p.get("performance") or {}).get("recent_minutes") or 0) >= 60
+        and any(
+            f["gameweek"] == target and f.get("was_home") and (f.get("difficulty") or 5) <= 2
+            for f in p.get("upcoming_fixtures", [])
+        )
+        and p["position"] in ("MID", "FWD")
         for p in squad
     )
     definitions = {
@@ -261,12 +309,24 @@ def compute_chip_advice(
             f"At most {playable} available players fit a starting formation in GW{target}; compare a temporary Free Hit with longer-term repairs.",
         ),
         "bench_boost": (
-            squad_ready and len(fit) == 15,
-            "Assess all four substitutes' likely minutes. Bench Boost can work in a single or double gameweek.",
+            (squad_ready and len(fit) == 15) or (pressured and ready_after),
+            "Assess all four substitutes' likely minutes. Bench Boost can work in a single or double gameweek."
+            + (
+                " All 15 have recent 60-minute starts only after the top eligible transfer."
+                if ready_after and not squad_ready
+                else ""
+            )
+            + expiry_note,
         ),
         "triple_captain": (
-            captain_double,
-            "Compare your strongest captain's fixtures and minutes. A double is an opportunity, not a requirement or a guarantee.",
+            captain_double or easy_home_captain,
+            "Compare your strongest captain's fixtures and minutes. A double is an opportunity, not a requirement or a guarantee."
+            + (
+                " A starting attacker with regular minutes has an easy (difficulty 2) home fixture."
+                if easy_home_captain and not captain_double
+                else ""
+            )
+            + expiry_note,
         ),
     }
     chip_names = {
@@ -479,12 +539,22 @@ def build_context(
     selected_ids = {option["in_id"] for option in decision["transfer_options"]}
     for position, pool in candidates.items():
         candidates[position] = [p for index, p in enumerate(pool) if index < 12 or p["player_id"] in selected_ids]
+    top = next((o for o in decision["transfer_options"] if o["eligible"]), None)
+    after_transfer = None
+    if top is not None:
+        incoming = next(
+            (p for pool in candidates.values() for p in pool if p["player_id"] == top["in_id"]),
+            None,
+        )
+        if incoming is not None:
+            after_transfer = [incoming if p["player_id"] == top["out_id"] else p for p in squad]
     chip_advice = compute_chip_advice(
         squad,
         target,
         state.get("available_chips") if state else None,
         state.get("active_chip") if state else None,
         decision["lineup"],
+        after_transfer,
     )
     warnings.append(
         "Form and fixtures are warehouse snapshots; refresh ingestion and team news before using advice. "

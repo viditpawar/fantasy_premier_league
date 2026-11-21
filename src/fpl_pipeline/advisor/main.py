@@ -80,6 +80,10 @@ history is unknown, not a confirmed zero-minute appearance.
 Chip advice in context is a conservative planning signal, not a guarantee of
 optimal timing. Availability/expiry must be confirmed in My Team; never
 recommend a used or unavailable chip or multiple chips in one gameweek.
+Chips expire: the first set must be played by GW19, the second by GW38. When
+chip_advice notes that unused chips nearly fill the remaining weeks, a strong
+single gameweek is a legitimate time to play one; say which chip to play this
+week (at most one) and sketch when the others fit before they expire.
 Single-gameweek Bench Boost/Triple Captain can be reasonable too. Free Hit
 temporarily changes the squad; plan the reverting squad for following weeks.
 
