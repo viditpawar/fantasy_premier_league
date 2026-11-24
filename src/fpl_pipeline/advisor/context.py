@@ -10,7 +10,13 @@ from fpl_pipeline.config import FPL_TEAM_ID
 
 from .evaluation import evaluate_warehouse, ranking_policy
 from .learned import LEARNED_VERSION, load_active, load_published, predict_upcoming
-from .model import MODEL_VERSION, apply_ranking_policy, decision_context, week_score
+from .model import (
+    MODEL_VERSION,
+    apply_ranking_policy,
+    best_lineup,
+    decision_context,
+    week_score,
+)
 from .rules import (
     CHIPS,
     POSITIONS,
@@ -225,18 +231,72 @@ def chip_window(target: int) -> int:
     return next(end for end in CHIP_WINDOW_ENDS if target <= end)
 
 
-def bench_ready(squad: list[dict]) -> bool:
-    """Every one of the 15 is available, has a fixture and played 60+ minutes
-    per fixture across the last two recorded gameweeks."""
-    return len(squad) == 15 and all(
-        available(p)
-        and p["next_gameweek_fixture_count"] > 0
-        and p["recent_form"]
-        and any(r.get("fixture_count", 1) > 0 for r in p["recent_form"][:2])
-        and sum(r["minutes"] for r in p["recent_form"][:2])
-        >= 60 * sum(r.get("fixture_count", 1) for r in p["recent_form"][:2])
-        for p in squad
+# A later week must beat this one by this share before a chip waits for it.
+CHIP_WAIT_MARGIN = 0.15
+
+
+def bench_strength(squad: list[dict], gameweek: int) -> float:
+    """Scores of the four players the optimized lineup would leave out."""
+    lineup = best_lineup(squad, gameweek)
+    return sum(week_score(p, gameweek) for p in squad if p["player_id"] in lineup["bench"])
+
+
+def captain_strength(squad: list[dict], gameweek: int, starters: set[int]) -> float:
+    return max(
+        (week_score(p, gameweek) for p in squad if p["player_id"] in starters and available(p)),
+        default=0.0,
     )
+
+
+def better_week(
+    strength, target: int, weeks_left: int, unused: int
+) -> tuple[int, float, float] | None:
+    """A clearly stronger week reachable without forfeiting any unused chip.
+
+    With N unused chips and W weeks before expiry, a chip can wait W - N weeks.
+    Only weeks the scores actually cover are compared; GW11's Bench Boost was
+    played on the first eligible week although later benches looked stronger.
+    """
+    slack = weeks_left - max(unused, 1)
+    if slack < 1:
+        return None
+    try:
+        now = strength(target)
+        later = [(gw, strength(gw)) for gw in range(target + 1, target + slack + 1)]
+    except (ValueError, KeyError):
+        return None
+    if not later:
+        return None
+    gameweek, best = max(later, key=lambda item: (item[1], -item[0]))
+    if best > max(now, 0.0) * (1 + CHIP_WAIT_MARGIN) and best > 0:
+        return gameweek, round(now, 2), round(best, 2)
+    return None
+
+
+def bench_ready(squad: list[dict]) -> bool:
+    """Require two recent fixtures with demonstrable 60-minute appearances."""
+    for player in squad:
+        if (
+            player["status"] != "a"
+            or player.get("chance_of_playing_next_round") not in (None, 100)
+            or player["next_gameweek_fixture_count"] < 1
+        ):
+            return False
+        fixtures_seen = 0
+        for row in sorted(player["recent_form"], key=lambda r: r["gameweek"], reverse=True):
+            count = row.get("fixture_count", 1)
+            if count < 1:
+                continue
+            # In a double, even if all other matches lasted 90 minutes,
+            # the remaining appearance must still have reached 60.
+            if row["minutes"] - 90 * (count - 1) < 60:
+                return False
+            fixtures_seen += count
+            if fixtures_seen >= 2:
+                break
+        if fixtures_seen < 2:
+            return False
+    return len(squad) == 15
 
 
 def compute_chip_advice(
@@ -299,6 +359,20 @@ def compute_chip_advice(
         and p["position"] in ("MID", "FWD")
         for p in squad
     )
+    boost_squad = after_transfer if ready_after and not squad_ready else squad
+    boost_wait = better_week(lambda gw: bench_strength(boost_squad, gw), target, weeks_left, unused)
+    captain_wait = better_week(
+        lambda gw: captain_strength(squad, gw, starter_ids), target, weeks_left, unused
+    )
+
+    def wait_note(wait, what):
+        return (
+            f" Hold: GW{wait[0]}'s {what} scores {wait[2]} against {wait[1]} now, and it can"
+            " be reached without forfeiting an unused chip."
+            if wait
+            else ""
+        )
+
     definitions = {
         "wildcard": (
             unavailable >= 4,
@@ -309,24 +383,26 @@ def compute_chip_advice(
             f"At most {playable} available players fit a starting formation in GW{target}; compare a temporary Free Hit with longer-term repairs.",
         ),
         "bench_boost": (
-            (squad_ready and len(fit) == 15) or (pressured and ready_after),
+            ((squad_ready and len(fit) == 15) or (pressured and ready_after)) and not boost_wait,
             "Assess all four substitutes' likely minutes. Bench Boost can work in a single or double gameweek."
             + (
-                " All 15 have recent 60-minute starts only after the top eligible transfer."
+                " All 15 have two recent 60-minute appearances only after the top eligible transfer."
                 if ready_after and not squad_ready
                 else ""
             )
-            + expiry_note,
+            + expiry_note
+            + wait_note(boost_wait, "bench"),
         ),
         "triple_captain": (
-            captain_double or easy_home_captain,
+            (captain_double or easy_home_captain) and not captain_wait,
             "Compare your strongest captain's fixtures and minutes. A double is an opportunity, not a requirement or a guarantee."
             + (
                 " A starting attacker with regular minutes has an easy (difficulty 2) home fixture."
                 if easy_home_captain and not captain_double
                 else ""
             )
-            + expiry_note,
+            + expiry_note
+            + wait_note(captain_wait, "best captain"),
         ),
     }
     chip_names = {
@@ -431,17 +507,38 @@ def build_context(
         (season,),
     ).fetchone()[0]
     horizon = min(4, 39 - target)
-    # Prefer a fresh local model; otherwise the predictions the scheduled
-    # training job published (both passed the same gate).
+    # A local artifact must not override a newer weekly deployment decision.
     bundle, learned_status = load_active(season, latest_finished)
-    if bundle is not None:
+    if bundle is not None and bundle["meta"]["trained_through"] == latest_finished:
         predictions = predict_upcoming(conn, bundle, season, target, horizon)
     else:
         predictions, published = load_published(
             conn, season, target, horizon, latest_finished
         )
-        if published["status"] != "absent" or learned_status["status"] == "absent":
-            learned_status = published
+        published_week = (published.get("summary") or {}).get("trained_through")
+        if bundle is not None and (
+            published["status"] == "absent"
+            or (published_week is not None and published_week < bundle["meta"]["trained_through"])
+        ):
+            predictions = predict_upcoming(conn, bundle, season, target, horizon)
+        else:
+            local_report = learned_status.get("summary") or {}
+            if (
+                local_report.get("version") == LEARNED_VERSION
+                and local_report.get("season") == season
+                and published_week is not None
+                and published_week < local_report.get("trained_through", 0) <= (latest_finished or 0)
+                and local_report.get("gate", {}).get("passed") is False
+            ):
+                predictions = {}
+            elif published["status"] != "absent" or learned_status["status"] == "absent":
+                learned_status = published
+    if predictions and set(all_codes).difference(predictions):
+        predictions = {}
+        learned_status = {
+            **learned_status, "status": "inactive",
+            "reason": "Predictions do not cover the current player list; refresh predictions.",
+        }
     if predictions:
         policy = {
             **policy,

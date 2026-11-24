@@ -55,6 +55,19 @@ def test_steady_returner_beats_single_recent_haul():
     assert haul["haul_share"] > 0.6
 
 
+def test_heuristic_evaluation_uses_live_baseline_for_past_doubles():
+    regular = player(1, points=(5, 5, 5, 2))
+    double = player(2, points=(4, 4, 9, 8))
+    double["recent_form"][2].update(fixture_count=2, minutes=180)
+    rows = [
+        {**row, "player_code": p["player_code"], "position": "MID"}
+        for p in (regular, double) for row in p["recent_form"]
+    ]
+    week = evaluate_rankings(rows, top_n=1)["weeks"][-1]
+    assert week["baseline_picks"] == [regular["player_code"]]
+    assert week["baseline_return"] == 2
+
+
 def test_cameo_and_missing_history_do_not_become_buy_signals():
     regular = performance_profile(player())
     cameo = performance_profile(player(points=(0, 0, 0, 0, 8), minutes=[0, 0, 0, 0, 5]))

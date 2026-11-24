@@ -8,11 +8,9 @@ from collections import defaultdict
 from collections.abc import Callable
 from copy import deepcopy
 
-from psycopg.rows import dict_row
-
-from .features import known_before
-from .model import MODEL_VERSION, performance_profile
-from .rules import POSITIONS, form_score
+from .features import known_before, load_season
+from .model import MODEL_VERSION, baseline_rating, performance_profile
+from .rules import form_score
 
 
 def ranking_policy(report: dict) -> dict:
@@ -76,7 +74,12 @@ def evaluate_rankings(
             new = scorer(actual, profile) if scorer else profile["rating"]
             if new is None:
                 continue
-            old = form_score([r for r in past if r["gameweek"] >= gw - 5])
+            # Learned-model reports retain their predeclared five-week form benchmark.
+            old = (
+                form_score([r for r in past if r["gameweek"] >= gw - 5])
+                if scorer is not None
+                else baseline_rating(player, profile)
+            )
             groups[actual["position"]].append(
                 {
                     "code": actual["player_code"],
@@ -130,30 +133,12 @@ def evaluate_rankings(
         )
         if count
         else None,
+        "baseline": "five-week form" if scorer is not None else "deployed form and minutes rating",
         "method": "Walk-forward top-five within position, same eligible pool, actual points per fixture; no current price, news or status. Ranking diagnostic, not a transfer or xP backtest.",
     }
 
 
 def evaluate_warehouse(conn) -> dict:
     season = conn.execute("select max(season) from gameweeks").fetchone()[0]
-    with conn.cursor(row_factory=dict_row) as cur:
-        cur.execute(
-            """
-            select s.player_code, s.gameweek, s.total_points, s.minutes,
-                s.goals_scored, s.assists, s.expected_goals, s.expected_assists,
-                coalesce(s.fixture_count, (select count(*) from fixtures f
-                    where f.season = s.season and f.gameweek = s.gameweek
-                    and s.team_id in (f.team_h, f.team_a))) as fixture_count,
-                p.element_type
-            from player_gameweek_stats s
-            join gameweeks g on g.season = s.season and g.id = s.gameweek
-            join players p on p.season = s.season and p.code = s.player_code
-            where s.season = %s and g.finished = true
-            order by s.gameweek, s.player_code
-        """,
-            (season,),
-        )
-        rows = cur.fetchall()
-    for row in rows:
-        row["position"] = POSITIONS[row.pop("element_type")]
+    rows, _ = load_season(conn, season)
     return {"season": season, **evaluate_rankings(rows)}

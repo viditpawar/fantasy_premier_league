@@ -151,13 +151,19 @@ def apply_ranking_policy(
         )
         profile["rating"] = points[min(points)] if points else 0.0
         return profile
+    profile["rating"] = baseline_rating(player, profile)
+    return profile
+
+
+def baseline_rating(player: dict, profile: dict) -> float:
+    """Score observed form using the same minutes adjustment in evaluation and live advice."""
     rows = sorted(
         (r for r in player.get("recent_form", []) if r.get("fixture_count", 1) > 0),
         key=lambda row: row["gameweek"],
         reverse=True,
     )[:5]
     if not rows:
-        return profile
+        return profile["rating"]
     weights = [2] + [1] * (len(rows) - 1)
     rating = sum(
         w * float(row["total_points"]) / row.get("fixture_count", 1)
@@ -166,16 +172,7 @@ def apply_ranking_policy(
     minutes = profile["minutes_per_fixture"] or 0
     if minutes > 0:
         rating *= min(1, ((profile["recent_minutes"] or 0) + 15) / (minutes + 15))
-    chance = player.get("chance_of_playing_next_round")
-    risk = (
-        chance / 100
-        if chance is not None
-        else 0.75
-        if player.get("status") == "d"
-        else 1
-    )
-    profile["rating"] = round(max(0, rating) * risk, 4) if available(player) else 0.0
-    return profile
+    return round(max(0, rating) * availability_risk(player), 4)
 
 
 def week_score(player: dict, gameweek: int) -> float:

@@ -72,6 +72,12 @@ bench cover, as recorded in the decision policy. Explain any bench tradeoff.
 Captain and vice must be different, available proposed starters with a target
 fixture, retained and starting under EVERY transfer alternative. Rank captain_score with
 minutes and availability; price and position do not determine the armband.
+Default to the first eligible player in the ordered decision.captain_candidates
+who starts under each proposed alternative. A different pick requires current
+team or minutes news in the supplied context. Explicitly name the default,
+the override and the evidence. Reputation and inactive models cannot justify
+an override. Use active rankings for the main recommendation. If discussing a
+failed model, label its numbers diagnostic and avoid team-total forecasts.
 Discuss useful bench coverage and legal formation-preserving swaps in
 lineup_watch. Bench points can count via autosubs or Bench Boost. Do not treat
 one missed match as proof a player is permanently dropped. A player with no

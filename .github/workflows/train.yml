@@ -35,7 +35,7 @@ jobs:
       - name: Train, evaluate and publish
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          IF_STALE: ${{ github.event_name == 'workflow_dispatch' && '' || '--if-stale' }}
+          IF_STALE: ${{ github.event_name != 'workflow_dispatch' && '--if-stale' || '' }}
         run: python -m fpl_pipeline.advisor --train $IF_STALE
       - name: Save model and full evaluation report
         if: success()

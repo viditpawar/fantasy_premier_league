@@ -623,16 +623,21 @@ export async function getPredictions(
   sb: SupabaseClient,
   season: string,
   target: number | null,
-  latestFinished: number,
   horizon = 6,
 ): Promise<{ run: PredictionRun | null; byCode: Map<number, { predicted: Record<number, number>; p60: number | null }> }> {
   const byCode = new Map<number, { predicted: Record<number, number>; p60: number | null }>();
   if (target == null) return { run: null, byCode };
-  const { data: run, error } = await sb.from("prediction_runs")
-    .select("model_version, trained_through, from_gameweek, gate_passed, summary, generated_at")
-    .eq("season", season).maybeSingle();
+  const [publication, finished] = await Promise.all([
+    sb.from("prediction_runs")
+      .select("model_version, trained_through, from_gameweek, gate_passed, summary, generated_at")
+      .eq("season", season).maybeSingle(),
+    sb.from("gameweeks").select("id").eq("season", season).eq("finished", true)
+      .order("id", { ascending: false }).limit(1).maybeSingle(),
+  ]);
+  const run = publication.data;
   // An older warehouse without the table simply has no predictions.
-  if (error || !run || !predictionRunUsable(run, target, latestFinished)) return { run: null, byCode };
+  if (publication.error || finished.error || !run || !predictionRunUsable(run, target, finished.data?.id ?? 0))
+    return { run: null, byCode };
   const weeks = Array.from({ length: Math.min(horizon, 39 - target) }, (_, i) => target + i);
   const pages = await Promise.all(weeks.map(gw => sb.from("player_predictions")
     .select("player_code, gameweek, predicted_points, p60").eq("season", season).eq("gameweek", gw)));

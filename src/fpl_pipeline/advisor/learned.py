@@ -64,10 +64,30 @@ PARAMS = {
 }
 
 
-def _matrix(examples: list[dict]):
+# Ordered input contract of the published v3 artifact. New additive features
+# can be evaluated without invalidating a validated fit on its original inputs.
+V3_INPUTS = [
+    "position", "gameweek", "price", "prior_fixtures", "minutes_last", "minutes_3",
+    "minutes_5", "minutes_10", "starts_5", "starts_season", "points_3", "points_5",
+    "points_10", "points_season", "bonus_5", "bps_5", "ict_5", "threat_5", "creativity_5",
+    "saves_5", "goal_involvements_5", "xg_5", "xa_5", "xg_10", "xa_10", "xgi_per90_5",
+    "prev_points_per_fixture", "prev_minutes_share", "was_home", "team_scored_5",
+    "team_conceded_5", "team_clean_sheets_5", "team_xg_5", "team_xga_5", "opponent_scored_5",
+    "opponent_conceded_5", "opponent_clean_sheets_5", "opponent_xg_5", "opponent_xga_5",
+    "xg_share_5",
+]
+
+
+def _supported_inputs(inputs) -> bool:
+    return inputs == FEATURES or (inputs == V3_INPUTS and set(inputs).issubset(FEATURES))
+
+
+def _matrix(examples: list[dict], inputs: list[str] | None = None):
     import numpy as np
 
-    return np.array([[float(e[f]) for f in FEATURES] for e in examples], dtype=float)
+    if inputs is None:
+        inputs = FEATURES
+    return np.array([[float(e[f]) for f in inputs] for e in examples], dtype=float)
 
 
 def fit(examples: list[dict], config: dict | None = None) -> dict:
@@ -82,7 +102,8 @@ def fit(examples: list[dict], config: dict | None = None) -> dict:
 
     config = config or {}
     params = {**PARAMS, **config.get("params", {})}
-    X = _matrix(examples)
+    inputs = V3_INPUTS if config.get("input_set") == "v3" else FEATURES
+    X = _matrix(examples, inputs)
     # The binner rejects a column with no values (e.g. no previous season
     # stored); such a feature carries no information for this fit anyway.
     empty_features = np.flatnonzero(np.isnan(X).all(axis=0)).tolist()
@@ -92,9 +113,18 @@ def fit(examples: list[dict], config: dict | None = None) -> dict:
     decay = config.get("season_decay", 1.0)
     newest = max(int(e["season"][:4]) for e in examples)
     weights = np.array([decay ** (newest - int(e["season"][:4])) for e in examples])
-    categorical = [f in CATEGORICAL for f in FEATURES]
+    # Give established starters more influence in the points fit. Eligibility
+    # uses only minutes known at the deadline. Keep the minutes classifier
+    # representative of the entire player pool.
+    points_weights = weights
+    if config.get("starter_weight"):
+        points_weights = weights * np.array([
+            config["starter_weight"] if e["minutes_5"] >= 60 else 1.0
+            for e in examples
+        ])
+    categorical = [f in CATEGORICAL for f in inputs]
     points = HistGradientBoostingRegressor(categorical_features=categorical, **params)
-    points.fit(X, [e["target_points"] for e in examples], sample_weight=weights)
+    points.fit(X, [e["target_points"] for e in examples], sample_weight=points_weights)
     minute_indices = [i for i, e in enumerate(examples) if e["target_60"] is not None]
     labels = {examples[i]["target_60"] for i in minute_indices}
     minutes = None
@@ -102,18 +132,18 @@ def fit(examples: list[dict], config: dict | None = None) -> dict:
         minutes = HistGradientBoostingClassifier(categorical_features=categorical, **params)
         minutes.fit(X[minute_indices], [examples[i]["target_60"] for i in minute_indices], sample_weight=weights[minute_indices])
     return {
-        "points": points, "minutes": minutes, "features": list(FEATURES),
+        "points": points, "minutes": minutes, "features": list(inputs),
         "empty_features": empty_features,
         "constant_p60": next(iter(labels)) if len(labels) == 1 else None,
     }
 
 
 def predict(bundle: dict, examples: list[dict]) -> list[tuple[float, float | None]]:
-    if bundle["features"] != FEATURES:
+    if not _supported_inputs(bundle["features"]):
         raise ValueError("Saved model features differ from this code; retrain the model.")
     if not examples:
         return []
-    X = _matrix(examples)
+    X = _matrix(examples, bundle["features"])
     X[:, bundle.get("empty_features", [])] = 0.0
     points = bundle["points"].predict(X)
     p60 = bundle["minutes"].predict_proba(X)[:, 1] if bundle["minutes"] else [bundle.get("constant_p60")] * len(X)
@@ -282,6 +312,7 @@ def select_config(data: dict, holdout: str) -> tuple[dict, dict]:
         {"name": "smoother", "params": {"max_iter": 100}, "season_decay": 1.0},
         {"name": "richer", "params": {"max_leaf_nodes": 15}, "season_decay": 1.0},
         {"name": "recent", "params": {}, "season_decay": 0.7},
+        {"name": "starters", "params": {}, "season_decay": 1.0, "starter_weight": 3.0},
     ]
     if len(earlier) < 2:
         return candidates[0], {"selected": "regularized", "reason": "Insufficient earlier seasons for separate tuning."}
@@ -324,8 +355,8 @@ def train(conn, model_dir: Path | str | None = None) -> dict:
     # the original fixed production settings may remain in service, but must
     # clear exactly the same gate on the repaired features. No additional
     # parameter search or threshold changes use test/current-season results.
-    if not report["gate"]["passed"] and config["name"] != "regularized":
-        incumbent_config = {"name": "regularized", "params": {}, "season_decay": 1.0}
+    if not report["gate"]["passed"] and (config["name"] != "regularized" or FEATURES != V3_INPUTS):
+        incumbent_config = {"name": "regularized", "params": {}, "season_decay": 1.0, "input_set": "v3"}
         incumbent = evaluate(data, holdout, current, incumbent_config)
         incumbent["gate"] = gate(incumbent)
         comparison = {"challenger": {"config": config, **report},
@@ -347,7 +378,7 @@ def train(conn, model_dir: Path | str | None = None) -> dict:
         "trained_through": trained_through,
         "trained_at": datetime.now(UTC).isoformat(),
         "seasons": seasons,
-        "features": FEATURES,
+        "features": bundle["features"],
         "params": {**PARAMS, **config["params"]},
         "config": config,
         "python_version": platform.python_version(),
@@ -426,7 +457,7 @@ def load_active(
         status = {"status": "inactive", "summary": summary(report) if report else None}
     except (AttributeError, KeyError, TypeError):
         return None, {"status": "unreadable", "reason": "Model metadata is incomplete; retrain."}
-    if bundle.get("features") != FEATURES or meta.get("version") != LEARNED_VERSION:
+    if not _supported_inputs(bundle.get("features")) or meta.get("version") != LEARNED_VERSION:
         status["reason"] = "Model was trained by different code; retrain."
     elif meta.get("season") != season:
         status["reason"] = "Model was trained for another season; retrain."
@@ -512,7 +543,11 @@ def predict_upcoming(
     prev_season = conn.execute(
         "select max(season) from gameweeks where season < %s", (season,)
     ).fetchone()[0]
-    previous = previous_summaries(load_season(conn, prev_season)[0]) if prev_season else {}
+    previous = (
+        previous_summaries(load_season(conn, prev_season)[0])
+        if prev_season and int(season[:4]) == int(prev_season[:4]) + 1
+        else {}
+    )
     players = load_players(conn, season)
     examples, keys = upcoming_examples(rows, fixtures, previous, players, target, horizon)
     result = {

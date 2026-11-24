@@ -2,6 +2,10 @@
 export const LEARNED_MODEL_VERSION = "learned-hgb-v3";
 export const MAX_PREDICTION_AGE_HOURS = 24;
 
+export function coversRoster(rows: ReadonlyMap<number, unknown>, roster: { playerCode: number }[]): boolean {
+  return roster.length > 0 && roster.every(player => rows.has(player.playerCode));
+}
+
 export function predictionRunUsable(run: {
   model_version: string; trained_through: number; from_gameweek: number | null;
   gate_passed: boolean; generated_at: string;

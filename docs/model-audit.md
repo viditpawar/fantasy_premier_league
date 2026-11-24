@@ -166,3 +166,33 @@ the [2025-26 scoring changes](https://www.premierleague.com/en/news/4373187),
 and scikit-learn's guidance on
 [data leakage](https://scikit-learn.org/stable/common_pitfalls) and
 [evaluation splits](https://scikit-learn.org/stable/modules/cross_validation.html).
+
+## Addendum — 24 November 2026 (after GW11)
+
+**What went wrong in GW11.** The model trained through GW10 failed only the
+current-season ranking check (−0.24 per pick, interval −0.77 to +0.25), so the
+advisor fell back to the form ranking. In the walk-forward replay the learned
+model would have beaten that fallback by **+1.85 points per pick in GW11**; the
+form ranking's top defenders scored 1.0 on average. The squad's poor week also
+came from decisions outside the model: Bench Boost was played on the first
+eligible week (bench total 6), and Haaland (C) scored 2.
+
+**Model change.** Added season-to-date club strength (goals and xG for and
+against, own club and opponent) beside the existing five-match form, because
+five matches of club results are noisy. Selected on validation seasons
+2022-23 to 2024-25 only; four player-rate features tested alongside did not
+help and were dropped.
+
+| Top-five lift per pick | Previous features | With club strength |
+| --- | ---: | ---: |
+| Validation average, 2022-23 to 2024-25 | +0.345 | +0.399 |
+| 2025-26 held out (top 3 / 5 / 10) | +0.65 / +0.51 / +0.58 | +0.67 / +0.51 / +0.66 |
+| 2026-27 walk-forward, GW4–11 | +0.06 | +0.40 |
+
+Retrained through GW11 with the normal pipeline, the selected setting passed
+every gate check (held-out lift +0.50, current +0.36) and predictions for
+GW12–17 were published.
+
+**Chip timing.** Bench Boost and Triple Captain now wait when a clearly
+stronger week (by at least 15%) is reachable without forfeiting an unused chip
+before it expires.

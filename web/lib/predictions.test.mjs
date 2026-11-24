@@ -6,8 +6,13 @@ import ts from "typescript";
 const { outputText } = ts.transpileModule(readFileSync(new URL("./predictions.ts", import.meta.url), "utf8"), {
   compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
 });
-const { LEARNED_MODEL_VERSION, predictionRunUsable, predictionRows } = await import(`data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`);
+const { LEARNED_MODEL_VERSION, coversRoster, predictionRunUsable, predictionRows } = await import(`data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`);
 const now = Date.parse("2026-11-08T12:00:00Z");
+test("a player missing from every forecast week keeps the entire roster on one scoring scale", () => {
+  const rows = new Map([[7, { predicted: { 12: 0 } }]]);
+  assert.equal(coversRoster(rows, [{ playerCode: 7 }]), true);
+  assert.equal(coversRoster(rows, [{ playerCode: 7 }, { playerCode: 8 }]), false);
+});
 const run = { model_version: LEARNED_MODEL_VERSION, trained_through: 9, from_gameweek: 11,
   gate_passed: true, generated_at: "2026-11-08T06:00:00Z" };
 

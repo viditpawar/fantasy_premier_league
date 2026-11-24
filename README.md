@@ -217,7 +217,7 @@ python -m fpl_pipeline.advisor --train   # allow several minutes; add --no-publi
 `--train` needs at least two completed seasons (run the historical backfill first). It then:
 
 1. checks training data for duplicates, invalid minutes/points and unrepaired double-gameweek records;
-2. compares four fixed model settings on an **earlier validation season**, then tests the selected setting on the **last completed season**, excluded from parameter selection and fitting;
+2. compares five fixed settings, including a points model that gives established starters greater training weight, on an **earlier validation season**, then tests the selected setting on the **last completed season**, excluded from parameter selection and fitting;
 3. retrains before **each finished week of the current season**, including GW1, and tests on that week;
 4. compares top-five picks per position against the form ranking on the same player pool, and reports prediction errors overall, by position and for regular players, plus playing-time accuracy and weekly ranking uncertainty;
 5. fits the final model on everything and saves it with its full report, data fingerprint and library versions under `data/models/` (git-ignored; `FPL_MODEL_DIR` overrides);

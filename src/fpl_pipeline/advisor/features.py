@@ -62,6 +62,14 @@ FIXTURE_FEATURES = [
     "opponent_clean_sheets_5",
     "opponent_xg_5",
     "opponent_xga_5",
+    "team_scored_season",
+    "team_conceded_season",
+    "team_xg_season",
+    "team_xga_season",
+    "opponent_scored_season",
+    "opponent_conceded_season",
+    "opponent_xg_season",
+    "opponent_xga_season",
 ]
 FEATURES = [*PLAYER_FEATURES, *FIXTURE_FEATURES, "xg_share_5"]
 CATEGORICAL = ["position"]
@@ -244,18 +252,28 @@ class TeamForm:
     @cache  # noqa: B019 - each instance exists for one season's feature build
     def before(self, team: int, gameweek: int) -> dict:
         cutoff = deadline(self.fixtures, gameweek)
-        games = [
+        season = [
             g for g in self.results.get(team, [])
             if g[0] < gameweek and (cutoff is None or (g[5] is not None and g[5] < cutoff))
-        ][-5:]
+        ]
+        games = season[-5:]
         if not games:
-            return {k: nan for k in ("scored", "conceded", "clean_sheets", "xg", "xga")}
+            return {k: nan for k in (
+                "scored", "conceded", "clean_sheets", "xg", "xga",
+                "scored_season", "conceded_season", "xg_season", "xga_season",
+            )}
+        # Five matches capture current form; the season-to-date mean is a
+        # steadier estimate of underlying club strength.
         return {
             "scored": _mean([g[1] for g in games]),
             "conceded": _mean([g[2] for g in games]),
             "clean_sheets": _mean([float(g[2] == 0) for g in games]),
             "xg": _mean([g[3] for g in games]),
             "xga": _mean([g[4] for g in games]),
+            "scored_season": _mean([g[1] for g in season]),
+            "conceded_season": _mean([g[2] for g in season]),
+            "xg_season": _mean([g[3] for g in season]),
+            "xga_season": _mean([g[4] for g in season]),
         }
 
 
@@ -278,6 +296,11 @@ def fixture_features(fixture: dict, team: int, form: TeamForm, as_of: int | None
         "opponent_clean_sheets_5": opp["clean_sheets"],
         "opponent_xg_5": opp["xg"],
         "opponent_xga_5": opp["xga"],
+        **{
+            f"{side}_{stat}_season": values[f"{stat}_season"]
+            for side, values in (("team", own), ("opponent", opp))
+            for stat in ("scored", "conceded", "xg", "xga")
+        },
     }
 
 
@@ -305,6 +328,7 @@ def build_examples(
     """
     previous = previous or {}
     form = TeamForm(fixtures, rows)
+    deadlines = {gw: deadline(fixtures, gw) for gw in {r["gameweek"] for r in rows}}
     by_fixture = {f["id"]: f for f in fixtures if f.get("id") is not None}
     by_team_week = defaultdict(list)
     for f in fixtures:
@@ -323,7 +347,7 @@ def build_examples(
                 team = row_team(r, by_fixture)
                 week = by_team_week.get((team, r["gameweek"]), [])
                 if week:
-                    cutoff = deadline(fixtures, r["gameweek"])
+                    cutoff = deadlines[r["gameweek"]]
                     known = [h for h in history if known_before(h, cutoff)]
                     # Today's fixture ratings and archive prices can be revised
                     # after a deadline. Use only the last observed price.
@@ -400,10 +424,11 @@ def load_season(conn, season: str) -> tuple[list[dict], list[dict]]:
         if kickoff:
             for team in (f["team_h"], f["team_a"]):
                 by_team_week[team, f["gameweek"]].append(kickoff + timedelta(hours=3))
+    deadlines = {gw: deadline(fixtures, gw) for gw in {r["gameweek"] for r in rows}}
     for r in rows:
         times = by_team_week[row_team(r, by_fixture), r["gameweek"]]
         r["available_at"] = max(times) if times else None
-        r["deadline_time"] = deadline(fixtures, r["gameweek"])
+        r["deadline_time"] = deadlines[r["gameweek"]]
     return rows, fixtures
 
 

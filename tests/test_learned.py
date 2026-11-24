@@ -321,3 +321,13 @@ def test_upcoming_examples_freeze_form_at_the_deadline():
     leaked = [dict(r, total_points=99) if r["gameweek"] >= 6 else r for r in rows]
     again = dict(zip(*reversed(learned.upcoming_examples(leaked, fixtures, {}, players, 6, 3))))
     assert same({k: again[1, 6][k] for k in FEATURES}, {k: a[k] for k in FEATURES})
+
+
+@pytest.mark.parametrize(
+    ("lift", "interval", "passed"),
+    [(-0.24, [-0.77, 0.25], False), (-0.8, [-1.6, -0.1], False), (0.06, [-0.62, 0.76], True)],
+)
+def test_uncertainty_interval_cannot_promote_a_measured_regression(lift, interval, passed):
+    data = report(current_lift=lift)
+    data["current"]["ranking"]["lift_interval_95"] = interval
+    assert learned.gate(data)["passed"] is passed

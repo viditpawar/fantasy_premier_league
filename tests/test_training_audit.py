@@ -2,6 +2,7 @@
 
 from copy import deepcopy
 from datetime import UTC, datetime, timedelta
+from unittest.mock import MagicMock
 
 import pytest
 from test_learned import features_at, report, same, season_data
@@ -63,6 +64,16 @@ def test_double_prediction_uses_the_same_average_context_as_training():
     assert target["target_60"] is None
 
 
+def test_upcoming_predictions_skip_priors_across_missing_season(monkeypatch):
+    conn = MagicMock()
+    conn.execute.return_value.fetchone.return_value = ("2024-25",)
+    load = MagicMock(return_value=([], []))
+    monkeypatch.setattr(learned, "load_season", load)
+    monkeypatch.setattr(learned, "load_players", lambda *args: [])
+    assert learned.predict_upcoming(conn, {"features": FEATURES}, "2026-27", 12, 1) == {}
+    load.assert_called_once_with(conn, "2026-27")
+
+
 def test_data_audit_rejects_the_old_overwritten_double_records():
     rows, fixtures = season_data()
     rows[0]["fixture_count"] = 2
@@ -117,7 +128,36 @@ def test_tuning_never_reads_holdout_or_current_targets(monkeypatch):
     monkeypatch.setattr(learned, "fit", fit)
     monkeypatch.setattr(learned, "predict", predict)
     _, selection = learned.select_config(data, "2025-26")
-    assert len(calls) == 4 and selection["validation_season"] == "2024-25"
+    assert calls == ["regularized", "smoother", "richer", "recent", "starters"]
+    assert selection["validation_season"] == "2024-25"
+
+
+def test_starter_candidate_weights_prior_minutes_only(monkeypatch):
+    ensemble = pytest.importorskip("sklearn.ensemble")
+    points, minutes = MagicMock(), MagicMock()
+    monkeypatch.setattr(ensemble, "HistGradientBoostingRegressor", lambda **kwargs: points)
+    monkeypatch.setattr(ensemble, "HistGradientBoostingClassifier", lambda **kwargs: minutes)
+    examples = build_examples(*season_data(weeks=5))
+    learned.fit(examples, {"starter_weight": 3.0})
+    assert list(points.fit.call_args.kwargs["sample_weight"]) == [
+        3.0 if e["minutes_5"] >= 60 else 1.0 for e in examples
+    ]
+    assert set(minutes.fit.call_args.kwargs["sample_weight"]) == {1.0}
+
+
+def test_additive_features_preserve_published_v3_input_order(monkeypatch):
+    pytest.importorskip("sklearn")
+    examples = build_examples(*season_data())
+    monkeypatch.setattr(learned, "FEATURES", list(learned.V3_INPUTS))
+    bundle = learned.fit(examples, {"params": {"max_iter": 3}})
+    original = learned.predict(bundle, examples)
+    monkeypatch.setattr(learned, "FEATURES", ["extra_input", *learned.V3_INPUTS])
+    assert learned.predict(bundle, examples) == original
+    refit = learned.fit(examples, {"params": {"max_iter": 3}, "input_set": "v3"})
+    assert refit["features"] == bundle["features"]
+    assert learned.predict(refit, examples) == original
+    with pytest.raises(ValueError, match="features differ"):
+        learned.predict({**bundle, "features": bundle["features"][1:]}, examples)
 
 
 def test_empty_current_season_cannot_be_silently_replaced_by_last_season(monkeypatch, tmp_path):

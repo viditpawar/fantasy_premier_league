@@ -61,7 +61,7 @@ def context():
             "price": 5,
             "next_gameweek_fixture_count": 1,
             "form_score": 5,
-            "recent_form": [{"gameweek": 7, "total_points": 5, "minutes": 90}],
+            "recent_form": [{"gameweek": gw, "total_points": 5, "minutes": 90} for gw in (7, 6)],
         }
         for i, position in enumerate(positions, 1)
     ]
@@ -330,6 +330,18 @@ def test_bench_boost_requires_minutes_from_starters_as_well_as_bench(context):
 ALL_CHIPS = ["wildcard", "freehit", "bboost", "3xc"]
 
 
+@pytest.mark.parametrize("history", [
+    [(1, 90), (1, 35)], [(2, 120)], [(1, 90)], [(0, 0), (1, 90), (1, 35)],
+])
+def test_bench_boost_requires_two_demonstrated_appearances(context, history):
+    squad = context["squad"]
+    squad[0]["recent_form"] = [
+        {"gameweek": 9-i, "minutes": minutes, "fixture_count": count}
+        for i, (count, minutes) in enumerate(history)
+    ]
+    assert not compute_chip_advice(squad, 11, ["bboost"])["bench_boost"]["recommended"]
+
+
 def test_bench_boost_counts_the_squad_after_the_top_transfer_near_expiry(context):
     squad = context["squad"]
     for row in squad[14]["recent_form"]:
@@ -519,6 +531,8 @@ def warehouse(context, monkeypatch):
             result.fetchone.return_value = (9, NOW + timedelta(days=2))
         elif "max(gameweek)" in sql:
             result.fetchone.return_value = (6,)  # target must NOT become 7
+        elif "max(id)" in sql:
+            result.fetchone.return_value = (8,)
         elif "from data_refresh_status" in sql:
             result.fetchone.return_value = (NOW,)
         elif "from manager_picks" in sql:
@@ -562,6 +576,39 @@ def test_build_context_research_never_guesses_current_funds(warehouse):
     assert result["budget"]["bank"] is None and not result["state_verified"]
     assert all(p["selling_price"] is None for p in result["squad"])
     assert result["context_id"] == context_fingerprint(result)
+
+
+def test_old_local_artifact_respects_newer_failed_gate(warehouse, monkeypatch):
+    bundle = {"meta": {"trained_through": 6}}
+    monkeypatch.setattr(context_module, "load_active", lambda *args: (bundle, {"status": "active"}))
+    published = {"status": "inactive", "reason": "failed gate", "summary": {"trained_through": 7}}
+    monkeypatch.setattr(context_module, "load_published", lambda *args: ({}, published))
+    result = context_module.build_context(warehouse, now=NOW)
+    assert result["ranking_policy"]["learned_model"] == published
+    assert result["ranking_policy"]["selected"] != "learned"
+
+
+def test_missing_player_never_mixes_index_and_points(warehouse, monkeypatch):
+    monkeypatch.setattr(context_module, "load_active", lambda *args: (None, {"status": "absent"}))
+    monkeypatch.setattr(context_module, "load_published",
+                        lambda *args: ({1001: {"points": {9: 3.0}}}, {"status": "active"}))
+    result = context_module.build_context(warehouse, now=NOW)
+    assert result["ranking_policy"]["selected"] != "learned"
+    assert "cover the current player list" in result["ranking_policy"]["learned_model"]["reason"]
+
+
+def test_newer_local_gate_failure_supersedes_old_publication(warehouse, monkeypatch):
+    local = {
+        "status": "inactive", "reason": "failed gate",
+        "summary": {"version": context_module.LEARNED_VERSION, "season": "2026-27",
+                    "trained_through": 8, "gate": {"passed": False}},
+    }
+    monkeypatch.setattr(context_module, "load_active", lambda *args: (None, local))
+    monkeypatch.setattr(context_module, "load_published", lambda *args: (
+        {1001: {"points": {9: 3}}}, {"status": "active", "summary": {"trained_through": 7}},
+    ))
+    result = context_module.build_context(warehouse, now=NOW)
+    assert result["ranking_policy"]["learned_model"] == local
 
 
 def test_build_context_current_squad_and_budget(warehouse, state):
@@ -644,3 +691,47 @@ def test_cli_check_does_not_save(context, suggestion, tmp_path, monkeypatch, cap
     cli.main()
     assert "nothing saved" in capsys.readouterr().out
     writer.assert_not_called()
+
+
+def _fixtures_by_week(squad, difficulties):
+    for p in squad:
+        p["upcoming_fixtures"] = [
+            {"gameweek": gw, "difficulty": d, "was_home": True} for gw, d in difficulties.items()
+        ]
+
+
+def test_bench_boost_waits_for_a_clearly_stronger_bench_week(context):
+    squad = context["squad"]
+    # GW11 is hard for everyone; GW12 is easy and reachable without losing a chip.
+    _fixtures_by_week(squad, {11: 5, 12: 2})
+    advice = compute_chip_advice(squad, 11, ALL_CHIPS)["bench_boost"]
+    assert not advice["recommended"]
+    assert "Hold: GW12" in advice["reason"]
+    # Equal weeks do not delay a chip that is otherwise ready.
+    _fixtures_by_week(squad, {11: 3, 12: 3})
+    assert compute_chip_advice(squad, 11, ALL_CHIPS)["bench_boost"]["recommended"]
+
+
+def test_chip_cannot_wait_when_every_remaining_week_is_needed(context):
+    squad = context["squad"]
+    _fixtures_by_week(squad, {16: 5, 17: 2})
+    # Four unused chips and four weeks to GW19: there is no slack to wait.
+    assert compute_chip_advice(squad, 16, ALL_CHIPS)["bench_boost"]["recommended"]
+
+
+def test_triple_captain_waits_for_a_stronger_captain_week(context):
+    squad = context["squad"]
+    lineup = {"starters": [p["player_id"] for p in squad if p["squad_position"] <= 11]}
+    forward = next(p for p in squad if p["position"] == "FWD" and p["squad_position"] <= 11)
+    forward["performance"] = {"recent_minutes": 90, "rating": 6.0, "sample_matches": 5}
+    _fixtures_by_week(squad, {15: 2, 16: 2})
+    forward["upcoming_fixtures"] = [
+        {"gameweek": 15, "difficulty": 2, "was_home": True},
+        {"gameweek": 16, "difficulty": 2, "was_home": True},
+        {"gameweek": 16, "difficulty": 2, "was_home": False},
+    ]
+    advice = compute_chip_advice(squad, 15, ["3xc", "freehit"], lineup=lineup)["triple_captain"]
+    assert not advice["recommended"] and "Hold: GW16" in advice["reason"]
+    # Without the stronger GW16 the easy home fixture triggers under expiry pressure.
+    forward["upcoming_fixtures"] = forward["upcoming_fixtures"][:2]
+    assert compute_chip_advice(squad, 15, ["3xc", "freehit"], lineup=lineup)["triple_captain"]["recommended"]
